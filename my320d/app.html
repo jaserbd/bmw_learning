@@ -142,22 +142,31 @@ svg{max-width:100%;height:auto;display:block}
 .lg-fu{background:color-mix(in srgb,var(--green) 50%,var(--surface));border-color:var(--green)}
 .lg-br{background:color-mix(in srgb,var(--red) 70%,var(--surface));border-color:var(--red)}
 
-/* ---------- engine bay ---------- */
-.bay text{font-family:var(--body);fill:var(--muted);font-size:11px}
-.bay .body{fill:var(--surface-2);stroke:var(--metal);stroke-width:2}
-.bay .tower{fill:none;stroke:var(--metal);stroke-width:2;stroke-opacity:.7}
-.bay .strut{fill:none;stroke:var(--plastic-2);stroke-width:5;stroke-linecap:round}
-.bay g.hot{cursor:pointer}
-.bay g.hot .num{fill:var(--surface);stroke:var(--accent);stroke-width:2}
-.bay g.hot .numt{fill:var(--accent);font-family:var(--display);font-weight:700;font-size:14px;text-anchor:middle}
-.bay g.hot.sel .shape{filter:drop-shadow(0 0 3px var(--accent)) drop-shadow(0 0 1px var(--accent))}
-.bay g.hot.sel .num{fill:var(--accent)} .bay g.hot.sel .numt{fill:var(--accent-ink)}
-.bay g.hot.seen .num{stroke:var(--green)}
+/* ---------- engine bay explorer ---------- */
+.grid2.ex{grid-template-columns:minmax(0,1.9fr) minmax(0,1fr)}
+@media (max-width:820px){.grid2.ex{grid-template-columns:minmax(0,1fr)}}
+#exFig{position:relative;border-radius:6px;overflow:hidden;background:#0c0e10;line-height:0}
+.exsvg{width:100%;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+.exsvg.zoomed{touch-action:none;cursor:grab}
+.exsvg g.pc{cursor:pointer;transition:opacity .22s,transform .22s;transform-box:fill-box;transform-origin:center}
+.exsvg g.pc.fix{cursor:help}
+.exsvg g.pc.leaving{opacity:0;transform:translateY(-16px) scale(1.05);pointer-events:none}
+.exsvg g.pc.gone{display:none}
+.exsvg g.pc.pulse{animation:expulse .5s 3}
+@keyframes expulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.exsvg g.pc{transition:none}.exsvg g.pc.pulse{animation:none}}
+.extip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:.8rem;line-height:1.3;font-weight:500;padding:4px 8px;border-radius:4px;white-space:nowrap;z-index:2}
+.chipbtn{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:2px 10px;font-size:.82rem}
+.search{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:100%;max-width:420px}
+#exList h4{font-family:var(--display);font-weight:600;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0}
+#exList .partlist button.off{text-decoration:line-through;color:var(--muted)}
+#exList .partlist button b:empty{display:none}
+#exList .partlist button.seen::after{content:"\2713";color:var(--green);margin-left:auto}
+.pill.info{color:var(--accent)}
 .partlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
 .partlist button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:6px 8px;font-size:.9rem;display:flex;gap:8px;align-items:center}
 .partlist button b{font-family:var(--display);color:var(--accent);min-width:1.2em}
 .partlist button.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
-.partlist button.seen b::after{content:" ✓";color:var(--green)}
 
 /* ---------- flow drawings ---------- */
 .flowsvg .tube{fill:none;stroke-width:14;stroke-linecap:round}
@@ -257,19 +266,33 @@ footer{color:var(--muted);font-size:.85rem;padding:0 0 32px;max-width:75ch}
 </section>
 
 <section class="view" id="v-engine-bay">
-  <h2>Open the hood and look around</h2>
-  <p class="lead">Tap a part to learn what it is, how to recognise it on the real car, and what you may touch. You are standing at the front bumper looking in, so the windscreen is at the top of the drawing.</p>
-  <div class="note"><b>Opening the hood on a G20:</b> pull the release lever in the driver's footwell <b>twice</b>. The first pull unlatches, the second releases the safety catch. Lift the hood; gas struts hold it up. To close, lower it to about 50 cm and let it drop, then press on the front edge until it clicks on both sides.</div>
-  <div class="grid2">
-    <div class="stack">
-      <div class="card"><div id="bay"></div>
-        <p class="small" style="margin-top:8px">Simplified drawing, not to scale. Exact positions differ by build. Find each item by the symbol on its cap, as described in the panel.</p></div>
-      <div class="partlist" id="partlist"></div>
-      <p id="seenCount" class="small"></p>
+  <h2>Take the engine bay apart</h2>
+  <p class="lead">This is what you see with the hood open, standing at the front bumper. Point at anything to see its name and what it does. Click a part to take it off and see what is underneath. On a phone, tap a part and press Remove.</p>
+  <div class="grid2 ex">
+    <div class="card stack">
+      <div class="row">
+        <button class="btn" id="exZout" aria-label="Zoom out">−</button>
+        <button class="btn" id="exZin" aria-label="Zoom in">+</button>
+        <span class="small">Zoom, then drag to move</span>
+        <span style="flex:1"></span>
+        <button class="btn" id="exStrip">Strip to the bare engine</button>
+        <button class="btn" id="exReset">Put everything back</button>
+      </div>
+      <div id="exFig"></div>
+      <p class="small">Simplified drawing of a typical layout for this engine, not traced from BMW's own diagrams. Exact positions and cable routes on your car will differ.</p>
     </div>
-    <div class="card sticky" id="partDetail" aria-live="polite"></div>
+    <div class="stack sticky">
+      <div class="card" id="exInfo" aria-live="polite"></div>
+      <div class="card row" id="exTray"></div>
+    </div>
   </div>
-  <p class="lead">The battery, fuel tank, AdBlue tank, gearbox and exhaust are not under the hood. Find them on the <a href="#whole-car">Whole car</a> drawing.</p>
+  <div class="card stack">
+    <div class="row"><h3>Find a part</h3><span style="flex:1"></span><span class="small" id="exCount"></span></div>
+    <input id="exSearch" class="search" type="search" placeholder="Type a name, for example turbo or fuse" aria-label="Search parts">
+    <div id="exList" class="stack"></div>
+  </div>
+  <div class="note"><b>Opening the hood on a G20:</b> pull the release lever in the driver's footwell <b>twice</b>. The first pull unlatches, the second releases the safety catch. Lift the hood; gas struts hold it up. To close, lower it to about 50 cm and let it drop, then press on the front edge until it clicks on both sides.</div>
+  <p class="lead">The battery, fuel tank, AdBlue tank and exhaust are not under the hood. Find them on the <a href="#whole-car">Whole car</a> drawing.</p>
 </section>
 
 <section class="view" id="v-how-it-works">
@@ -491,7 +514,7 @@ var carParts=[
   shape:'<rect class="i-el" x="852" y="218" width="46" height="28" rx="3"/><rect class="i-red" x="858" y="213" width="8" height="6" rx="1"/><rect class="i-st" x="884" y="213" width="8" height="6" rx="1"/>',
   where:"In the boot, under the floor on the right.",
   what:"Runs the electronics and lights. BMW puts it in the back for weight balance.",
-  know:"You never need to reach it for a jump start: use the terminals under the hood (engine bay part 6). Batteries last about 5 to 8 years, and a new one must be registered to the car by the workshop."},
+  know:"You never need to reach it for a jump start: use the terminals under the hood. Batteries last about 5 to 8 years, and a new one must be registered to the car by the workshop."},
  {id:"sg",name:"Starter-generator",pic:"belt",a:[146,246],l:[90,372],
   shape:'<path class="i-belt" d="M138 232L141 268L160 266L154 230Z"/><circle class="i-st" cx="150" cy="264" r="10"/><circle class="i-el" cx="146" cy="236" r="9"/>',
   where:"At the front of the engine, driven by the ribbed belt.",
@@ -583,119 +606,422 @@ function showCar(id){
   centre($("#carFig"),p.a[0]);
 }
 
-/* ---------- engine bay ---------- */
-var parts=[
- {n:1,name:"Engine and its cover",pic:"engine",at:[300,180],
-  shape:'<rect class="i-pl" x="236" y="128" width="128" height="188" rx="14"/><path class="i-thin" d="M254 148h92M254 162h92M254 262h92M254 276h92"/><circle class="i-st" cx="300" cy="222" r="15"/><circle class="i-thin" cx="300" cy="222" r="8"/>',
-  what:"The big plastic cover hides the engine itself: a 2.0 litre four-cylinder diesel (BMW code B47). Under it sit the injectors, the fuel rail and the valve gear. The cover is there for noise and looks.",
-  spot:"The large black panel in the middle with the BMW badge.",
-  you:"Nothing to do here. Do not remove the cover. Look around its edges now and then for wet oil or coolant traces.",
-  links:"Engine warning light, drivetrain malfunction message."},
- {n:2,name:"Oil filler cap",pic:"oilcap",at:[300,296],
-  shape:'<circle class="i-st" cx="268" cy="296" r="13"/><circle class="i-pl" cx="268" cy="296" r="8"/>',
-  what:"Where engine oil is topped up. Your car has <b>no dipstick</b>. A sensor measures the level and shows it on the screen under CAR &gt; Vehicle status &gt; Engine oil level.",
-  spot:"A round black screw cap on top of the engine with an oil-can symbol.",
-  you:"Top up only when the car asks, usually 1 litre at a time, with oil that carries the BMW Longlife approval named in your manual. Engine off. Never overfill.",
-  links:"Yellow oil level message, red oil pressure light."},
- {n:3,name:"Coolant expansion tank",pic:"coolant",at:[150,294],
-  shape:'<path class="i-gl" d="M96 258q0-10 10-10h52q10 0 10 10v40q0 12-12 12h-48q-12 0-12-12z"/><path class="i-cool i-liq" d="M98 286h68v12q0 10-10 10h-48q-10 0-10-10z"/><circle class="i-pl" cx="120" cy="268" r="11"/>',
-  what:"Reservoir for the engine coolant (water mixed with antifreeze). It gives the liquid room to expand as it heats up. Some builds have a second, smaller tank for a separate low-temperature circuit; treat both the same way.",
-  spot:"A black or translucent tank with a round cap showing a thermometer or steam warning symbol. The level indicator is under the cap or on the side with MIN and MAX.",
-  you:"Check the level only with the engine <b>cold</b>. Never open the cap when hot: the system is under pressure and can scald you. If it is low once, top up with BMW-approved coolant mix. If it drops again, there is a leak: go to a workshop.",
-  links:"Red coolant temperature light, coolant level message."},
- {n:4,name:"Washer fluid filler",pic:"washer",at:[500,300],
-  shape:'<circle class="i-cool" cx="468" cy="300" r="15"/><circle cx="468" cy="300" r="8" fill="none" stroke="var(--accent-ink)" stroke-width="1.5"/>',
-  what:"Tank for the windscreen washer fluid. The tank is hidden; you only see the filler neck.",
-  spot:"A blue flip cap with a windscreen-and-spray symbol.",
-  you:"The one thing here you will refill regularly. Use ready-mixed washer fluid, with antifreeze in winter. Fill until you see fluid in the neck.",
-  links:"Washer fluid low message."},
- {n:5,name:"Brake fluid reservoir",pic:"brakefluid",at:[408,114],
-  shape:'<rect class="i-gl" x="424" y="96" width="56" height="36" rx="8"/><circle class="i-el" cx="452" cy="114" r="11"/>',
-  what:"Holds the hydraulic fluid that carries your pedal force to the brakes. The level sinks slowly as pads wear. That is normal.",
-  spot:"Near the windscreen on the driver's side, usually under a plastic cover. A small tank with a yellow or black cap showing a circle-in-brackets symbol.",
-  you:"Look, do not touch. Level should sit between MIN and MAX. Brake fluid absorbs water and is replaced by a workshop every two years. It damages paint and skin.",
-  links:"Red brake warning light, brake pad wear light."},
- {n:6,name:"Jump-start terminals",pic:"jump",at:[126,142],
-  shape:'<rect class="i-red" x="108" y="98" width="36" height="26" rx="5"/><path d="M126 104v14M119 111h14" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><circle class="i-st" cx="160" cy="128" r="6"/>',
-  what:"Because the battery lives in the boot, BMW gives you connection points under the hood for jump-starting or charging.",
-  spot:"Positive: a red plastic flap marked with a plus sign. Negative: a bare metal post or nut on the body marked with a minus sign.",
-  you:"Order for jump leads: red to the dead car's plus, red to the donor's plus, black to the donor's minus, black to your earth point. Remove in reverse. On a mild hybrid, follow the manual exactly or call roadside assistance.",
-  links:"Red battery light, low battery messages."},
- {n:7,name:"Air filter box and intake",pic:"airbox",at:[445,222],
-  shape:'<path class="i-duct" d="M445 258C445 300 424 312 412 344" style="stroke-width:12"/><rect class="i-pl" x="404" y="186" width="82" height="72" rx="10"/><path class="i-thin" d="M414 200h62M414 244h62"/>',
-  what:"All the air the engine burns enters here and passes through a paper filter that keeps dust out. An air-mass sensor right after it tells the engine computer how much air is coming in.",
-  spot:"A large flat black plastic box with a wide duct coming from the front grille.",
-  you:"Nothing routine. The filter is changed by the workshop. Just keep leaves and rags away from the intake duct.",
-  links:"Engine warning light (air-mass sensor), loss of power."},
- {n:8,name:"Turbocharger",pic:"turbo",at:[178,184],
-  shape:'<rect class="i-st" x="203" y="176" width="10" height="16"/><circle class="i-hot" cx="208" cy="166" r="16"/><circle class="i-pl" cx="208" cy="166" r="5"/><circle class="i-st" cx="208" cy="202" r="13"/><circle class="i-pl" cx="208" cy="202" r="4"/>',
-  what:"Exhaust gas spins a small turbine at up to around 200,000 rpm. On the same shaft a compressor wheel forces more air into the engine. More air means more fuel can burn, which is where the pulling power comes from.",
-  spot:"Mostly hidden low on the exhaust side of the engine under heat shields. You will see thick metal pipes and silver shielding.",
-  you:"Never touch: it gets extremely hot. It lives on clean oil, so on-time oil changes are its life insurance.",
-  links:"Drivetrain malfunction, whistling or siren noise, blue smoke, loss of power."},
- {n:9,name:"Radiator, intercooler and A/C condenser",pic:"radiator",at:[300,362],
-  shape:'<rect class="i-cool" x="150" y="350" width="300" height="24" rx="5"/><path class="i-fin" d="'+fins(158,444,352,372,7)+'"/>',
-  what:"A stack of heat exchangers right behind the grille. The radiator cools engine coolant, the charge-air cooler cools the air from the turbo, and the condenser belongs to the air conditioning. An electric fan pulls air through.",
-  spot:"Look down behind the front panel: thin aluminium fins in flat layers.",
-  you:"Keep the grille free of leaves and plastic bags. The fan can start by itself, even after the engine is off, so keep hands clear.",
-  links:"Coolant temperature light, weak air conditioning."},
- {n:10,name:"Belt drive and 48 V starter-generator",pic:"belt",at:[226,328],
-  shape:'<rect class="i-pl" x="246" y="323" width="100" height="8" rx="3"/><rect class="i-el" x="338" y="317" width="36" height="20" rx="7"/>',
-  what:"A ribbed belt at the front of the engine drives the air-conditioning compressor and, on the mild hybrid, a 48 V starter-generator. That unit restarts the engine smoothly at traffic lights, charges the batteries when you slow down and adds a small boost when you accelerate.",
-  spot:"Low at the front end of the engine. You may only glimpse the belt and pulleys. The 48 V battery that feeds it is part 13; orange cables mark higher-voltage parts.",
-  you:"Never touch with the engine running or the ignition on. A squealing noise at start-up means the belt needs a look. Leave orange cables alone.",
-  links:"Red battery light, 48 V system or drivetrain messages, start-stop not working."},
- {n:11,name:"Cabin air filter housing",pic:"cabin",at:[300,76],
-  shape:'<rect class="i-pl" x="200" y="64" width="200" height="24" rx="6"/><path class="i-thin" d="M212 71h176M212 81h176"/>',
-  what:"Air for the cabin is drawn in at the base of the windscreen and passes through a microfilter that catches pollen and dust.",
-  spot:"Under the black plastic trim at the base of the windscreen.",
-  you:"Keep the slots free of leaves. The filter is changed with the service. A musty smell or weak airflow means it is overdue.",
-  links:"Service due: microfilter."},
- {n:12,name:"Hood struts and latches",pic:"strut",at:[90,196],
-  shape:'<path class="strut" d="M82 96L94 176M518 96L506 176"/><rect class="i-st" x="140" y="386" width="22" height="10" rx="2"/><rect class="i-st" x="438" y="386" width="22" height="10" rx="2"/>',
-  what:"Two gas struts hold the hood open, and two latches at the front corners lock it shut.",
-  spot:"Thin black rods at the sides near the hinges, and metal catches at the front left and right.",
-  you:"If the hood slowly sinks, the struts are worn. After closing, check both sides are flush.",
-  links:"Hood open warning."},
- {n:13,name:"48 V battery",pic:"batt48",at:[205,112],
-  shape:'<rect class="i-el" x="178" y="98" width="54" height="28" rx="5"/>',
-  what:"A small lithium-ion battery for the mild hybrid system. It stores the energy recovered when you slow down and feeds the starter-generator (part 10).",
-  spot:"A flat box under a plastic cover. Its position differs by build, so the drawing shows only a likely spot. Your owner's manual shows the exact place.",
-  you:"Nothing. It is maintenance-free. Leave the cover on and the cables alone.",
-  links:"48 V system or drivetrain messages, start-stop not working."}
-];
-var seen=store.get("seen",{});var curPart=1;
-function drawBay(){
-  var s='<svg class="bay" viewBox="0 0 600 420" role="img" aria-label="Top view of the engine bay with the parts you can find under the hood">';
-  s+='<path class="body" d="M70 60 Q300 30 530 60 L548 330 Q540 392 470 400 L130 400 Q60 392 52 330 Z"/>';
-  s+='<circle class="tower" cx="104" cy="216" r="20"/><circle class="tower" cx="506" cy="150" r="18"/>';
-  s+='<text x="300" y="52" text-anchor="middle">windscreen</text><text x="300" y="414" text-anchor="middle">front bumper (you stand here)</text>';
-  parts.forEach(function(p){
-    s+='<g class="hot" data-n="'+p.n+'" tabindex="0" role="button" aria-label="'+esc(p.name)+'"><g class="shape">'+p.shape+'</g>'+
-       '<circle class="num" cx="'+p.at[0]+'" cy="'+p.at[1]+'" r="11"/><text class="numt" x="'+p.at[0]+'" y="'+(p.at[1]+5)+'">'+p.n+'</text></g>';
-  });
-  s+='</svg>';
-  $("#bay").innerHTML=s;
-  $("#partlist").innerHTML=parts.map(function(p){return '<button data-n="'+p.n+'"><b>'+p.n+'</b>'+esc(p.name)+'</button>'}).join("");
-  function pick(e){var g=e.target.closest("[data-n]");if(g)showPart(+g.getAttribute("data-n"))}
-  $("#bay").addEventListener("click",pick);$("#partlist").addEventListener("click",pick);
-  $("#bay").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();pick(e)}});
+/* ---------- engine bay explorer ---------- */
+/* The drawing keeps one fixed look (a dark engine bay) in both themes, so its colours are literal. */
+function hose(d,w,c,corr){
+  var s='<path d="'+d+'" fill="none" stroke="#050607" stroke-width="'+(w+3)+'" stroke-linecap="round" stroke-linejoin="round"/><path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round"/>';
+  if(corr)s+='<path d="'+d+'" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="'+w+'" stroke-dasharray="2.5 4.5"/>';
+  return s+'<path d="'+d+'" fill="none" stroke="#fff" stroke-opacity=".2" stroke-width="'+(w*.28).toFixed(1)+'" stroke-linecap="round" stroke-linejoin="round"/>';
 }
-function showPart(n){
-  curPart=n;seen[n]=1;store.set("seen",seen);
-  var p=parts[n-1];
-  $("#partDetail").innerHTML='<div class="stack"><h3>'+p.n+'. '+esc(p.name)+'</h3>'+pic(p.pic,p.name)+'<dl class="sheet">'+
-    '<div><dt>What it is</dt><dd>'+p.what+'</dd></div>'+
-    '<div><dt>How to spot it</dt><dd>'+p.spot+'</dd></div>'+
-    '<div><dt>What you do</dt><dd>'+p.you+'</dd></div>'+
-    '<div><dt>Related warnings</dt><dd>'+p.links+' <a href="#warning-lights">See warning lights</a></dd></div></dl>'+
-    '<div class="row"><button class="btn" id="prevP">Previous</button><button class="btn primary" id="nextP">Next part</button></div></div>';
-  $("#prevP").onclick=function(){showPart(n===1?parts.length:n-1)};
-  $("#nextP").onclick=function(){showPart(n===parts.length?1:n+1)};
-  document.querySelectorAll("#bay g.hot,#partlist button").forEach(function(el){
-    var k=+el.getAttribute("data-n");el.classList.toggle("sel",k===n);el.classList.toggle("seen",!!seen[k]);
+function rr(x,y,w,h,r,f,st){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="'+f+'" stroke="'+(st||"#08090a")+'" stroke-width="1.5"/>'}
+function kcap(cx,cy,r,f){return '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+f+'" stroke="#08090a" stroke-width="1.5"/><circle cx="'+cx+'" cy="'+cy+'" r="'+(r-2.5)+'" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="4" stroke-dasharray="3 3"/><ellipse cx="'+(cx-r*.3)+'" cy="'+(cy-r*.38)+'" rx="'+(r*.36)+'" ry="'+(r*.2)+'" fill="#fff" fill-opacity=".28"/>'}
+function bolt(x,y,r){return '<circle cx="'+x+'" cy="'+y+'" r="'+(r||3.5)+'" fill="url(#xSt)" stroke="#2a2d31" stroke-width=".8"/>'}
+function conn(x,y,w,h,c){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="2" fill="#17191c" stroke="#666b72" stroke-width=".8"/><rect x="'+(x+w*.3)+'" y="'+(y+h*.25)+'" width="'+(w*.4)+'" height="'+(h*.5)+'" rx="1" fill="'+c+'"/>'}
+function lines(d,o,w){return '<path d="'+d+'" fill="none" stroke="#000" stroke-opacity="'+(o||.3)+'" stroke-width="'+(w||2)+'" stroke-linecap="round"/>'}
+function shine(x,y,w,h,r){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+r+'" fill="#fff" fill-opacity=".07"/>'}
+var CY=[262,327,392,457];
+function each4(f){return CY.map(f).join("")}
+
+var EX_DEFS='<defs>'+
+ '<linearGradient id="xPl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#474d55"/><stop offset="1" stop-color="#1d2024"/></linearGradient>'+
+ '<linearGradient id="xPl2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3339"/><stop offset="1" stop-color="#121416"/></linearGradient>'+
+ '<linearGradient id="xAl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eef1f3"/><stop offset=".5" stop-color="#a9b1b9"/><stop offset="1" stop-color="#7b848d"/></linearGradient>'+
+ '<linearGradient id="xAlD" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a7afb7"/><stop offset="1" stop-color="#565e66"/></linearGradient>'+
+ '<linearGradient id="xSt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6f8f9"/><stop offset="1" stop-color="#a9b1b8"/></linearGradient>'+
+ '<linearGradient id="xCast" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8a7667"/><stop offset="1" stop-color="#3d322b"/></linearGradient>'+
+ '<linearGradient id="xSh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e1d4"/><stop offset="1" stop-color="#99937f"/></linearGradient>'+
+ '<linearGradient id="xPaint" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2b3f5c"/><stop offset=".12" stop-color="#5b7599"/><stop offset=".5" stop-color="#3a5275"/><stop offset=".88" stop-color="#5b7599"/><stop offset="1" stop-color="#2b3f5c"/></linearGradient>'+
+ '<radialGradient id="xPaintR"><stop offset="0" stop-color="#6481a6"/><stop offset="1" stop-color="#2b3f5c"/></radialGradient>'+
+ '<linearGradient id="xRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8554d"/><stop offset="1" stop-color="#9c1f1c"/></linearGradient>'+
+ '<radialGradient id="xBlue"><stop offset="0" stop-color="#63adf2"/><stop offset="1" stop-color="#1f5fae"/></radialGradient>'+
+ '<radialGradient id="xYel"><stop offset="0" stop-color="#f8dc5c"/><stop offset="1" stop-color="#c2900e"/></radialGradient>'+
+ '<linearGradient id="xTank" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f8f9"/><stop offset="1" stop-color="#c3cad0"/></linearGradient>'+
+ '<linearGradient id="xGlass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c141d"/><stop offset="1" stop-color="#22364b"/></linearGradient>'+
+ '<radialGradient id="xFloor"><stop offset="0" stop-color="#24282d"/><stop offset="1" stop-color="#0e1012"/></radialGradient>'+
+ '<pattern id="xFin" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#77818b"/><rect width="1.6" height="4" fill="#d5dbe0"/></pattern>'+
+ '<pattern id="xPleat" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#eadfb6"/><rect width="3" height="7" fill="#c6b684"/></pattern>'+
+ '<pattern id="xPleatW" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#eef0f1"/><rect width="2.5" height="6" fill="#b4bac0"/></pattern>'+
+ '<pattern id="xEmb" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1.7" fill="#000" fill-opacity=".14"/><circle cx="3.4" cy="3.4" r="1" fill="#fff" fill-opacity=".3"/></pattern>'+
+ '<filter id="xShd" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur in="SourceAlpha" stdDeviation="2.2"/><feOffset dy="3"/><feComponentTransfer><feFuncA type="linear" slope=".6"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'+
+ '<filter id="xGlw" x="-20%" y="-20%" width="140%" height="140%"><feMorphology in="SourceAlpha" operator="dilate" radius="2.5" result="d"/><feFlood flood-color="#ffd54a"/><feComposite in2="d" operator="in" result="g"/><feComponentTransfer in="SourceGraphic" result="b"><feFuncR type="linear" slope="1.25"/><feFuncG type="linear" slope="1.25"/><feFuncB type="linear" slope="1.25"/></feComponentTransfer><feMerge><feMergeNode in="g"/><feMergeNode in="b"/></feMerge></filter>'+
+ '</defs>';
+
+var EX_BASE='<rect width="1000" height="760" fill="#0c0e10"/>'+
+ '<path fill-rule="evenodd" fill="url(#xPaint)" d="M30 0H970V600Q970 742 800 754H200Q30 742 30 600ZM132 60H868L880 640Q872 694 800 700H200Q128 694 120 640Z"/>'+
+ '<path d="M30 0H970V40Q500 12 30 40Z" fill="url(#xGlass)"/>'+
+ '<path d="M82 70V600M918 70V600" stroke="#fff" stroke-opacity=".1" stroke-width="3" fill="none"/>'+
+ '<path d="M72 652Q62 716 150 738L196 716Q122 700 112 648Z" fill="#cfe0ee" fill-opacity=".8" stroke="#0b0d0f" stroke-width="2"/><path d="M928 652Q938 716 850 738L804 716Q878 700 888 648Z" fill="#cfe0ee" fill-opacity=".8" stroke="#0b0d0f" stroke-width="2"/>'+
+ '<rect x="424" y="712" width="72" height="30" rx="12" fill="#0b0c0e" stroke="#c9d0d6" stroke-width="2.5"/><rect x="504" y="712" width="72" height="30" rx="12" fill="#0b0c0e" stroke="#c9d0d6" stroke-width="2.5"/>'+
+ '<path d="M132 60H868L880 640Q872 694 800 700H200Q128 694 120 640Z" fill="url(#xFloor)" stroke="#07080a" stroke-width="3"/>'+
+ '<path d="M132 130L120 640Q124 668 152 684L164 640L172 130Z" fill="url(#xPaint)" fill-opacity=".5"/><path d="M868 130L880 640Q876 668 848 684L836 640L828 130Z" fill="url(#xPaint)" fill-opacity=".5"/>'+
+ '<rect x="140" y="60" width="720" height="72" fill="#15171a"/><path d="'+rows(150,850,74,124,10)+'" stroke="#fff" stroke-opacity=".03" stroke-width="3" fill="none"/>'+
+ '<path d="M300 430H700M330 500H670" stroke="#1b1e22" stroke-width="20" stroke-linecap="round" fill="none"/>';
+
+/* P(id, name, system, fixed, hidden-under, what it does, connected to, what you do, drawing) — listed bottom layer first */
+var EX=[];
+function P(id,name,sys,fix,under,d,c,you,s){EX.push({id:id,name:name,sys:sys,fix:fix,under:under,d:d,c:c,you:you,s:s})}
+var SYS={tr:"Covers and trim",en:"Engine",ai:"Air and turbo",fu:"Fuel",ex:"Exhaust",co:"Cooling",el:"Electrical",bo:"Brakes, body and cabin"};
+
+P("gearbox","Gearbox bell housing","en",1,[],
+ "The front end of the 8-speed automatic. It bolts to the back of the engine and disappears under the bulkhead into the centre tunnel. Inside this bell sits the torque converter.",
+ "Engine crankshaft at the front, propshaft at the back.","",
+ '<path d="M428 132h144l-12 66h-120z" fill="url(#xAlD)" stroke="#08090a" stroke-width="1.5"/>'+lines("M452 138l6 56M476 136v60M500 136v60M524 136v60M548 138l-6 56"));
+P("block","Engine (cylinder head and block)","en",1,[],
+ "The engine itself: four cylinders in a row, lengthways in the car. The black part on top is the cylinder head cover; under it are the camshafts and valves. The timing chain is at the back, next to the gearbox.",
+ "Everything. Air comes in on the right of the drawing, exhaust leaves on the left, fuel arrives from above, and the belt drive is at the front.",
+ "Look around its edges now and then for wet oil or coolant traces.",
+ rr(412,198,176,352,10,"url(#xAl)")+rr(424,210,152,312,16,"url(#xPl)")+lines(rows(442,558,236,496,26),.28)+
+ each4(function(y){return '<circle cx="500" cy="'+y+'" r="11" fill="#060708" stroke="#5c636b" stroke-width="2"/><circle cx="440" cy="'+(y+13)+'" r="5" fill="#060708" stroke="#5c636b" stroke-width="1.5"/><ellipse cx="589" cy="'+y+'" rx="5" ry="10" fill="#060708"/>'})+
+ '<circle cx="545" cy="508" r="15" fill="#050506" stroke="#8a9199" stroke-width="3"/>'+bolt(432,218)+bolt(568,218)+bolt(432,514)+bolt(468,514)+bolt(432,366)+bolt(568,366)+bolt(424,538,4)+bolt(576,538,4));
+P("exmani","Exhaust manifold","ex",1,["shield"],
+ "A cast-iron pipe that collects the hot exhaust from the four cylinders and leads it into the turbo. It glows dull red under hard driving.",
+ "Cylinder head on one side, turbocharger on the other.","Never touch it after driving.",
+ each4(function(y){return rr(404,y-10,14,20,4,"url(#xCast)")})+rr(388,238,22,236,9,"url(#xCast)")+rr(376,290,16,24,3,"url(#xCast)"));
+P("turbo","Turbocharger","ai",1,["shield"],
+ "Exhaust gas spins a turbine (the brown, cast-iron half). On the same shaft a compressor wheel (the bright aluminium half) forces more air into the engine. Your 320d actually has two turbos working in stages, a small one for low revs and a larger one for high revs; the drawing shows them as one unit.",
+ "Exhaust manifold and particulate filter on the hot side. Air filter and charge pipe on the cold side. An oil line keeps its shaft alive.",
+ "Never touch: it gets extremely hot. It lives on clean oil, so on-time oil changes are its life insurance.",
+ hose("M352 278Q340 264 334 252",20,"#5a4a40")+rr(356,318,24,26,3,"url(#xAlD)")+'<circle cx="368" cy="300" r="30" fill="url(#xCast)" stroke="#08090a" stroke-width="1.5"/>'+lines("M348 300a20 20 0 0 1 40 0a14 14 0 0 1-28 0a8 8 0 0 1 16 0",.35)+
+ rr(358,384,20,12,2,"url(#xAl)")+rr(386,362,16,16,2,"url(#xAl)")+'<circle cx="368" cy="362" r="27" fill="url(#xAl)" stroke="#08090a" stroke-width="1.5"/>'+lines("M350 362a18 18 0 0 1 36 0a12 12 0 0 1-24 0a7 7 0 0 1 14 0",.3)+'<circle cx="368" cy="362" r="6" fill="#22252a"/>'+
+ rr(322,326,28,22,4,"url(#xPl)")+conn(326,318,14,10,"#3d8fe0"));
+P("dpf","Catalyst and particulate filter","ex",1,[],
+ "A steel can bolted right behind the turbo. Inside, a catalyst burns off carbon monoxide and unburnt fuel, and a ceramic honeycomb traps soot. Every few hundred kilometres the car heats it above about 600 °C to burn the soot to ash.",
+ "Turbocharger above, exhaust pipe below. Thin pipes lead to a pressure sensor that tells the car how full the filter is.",
+ "Give the car a 20 to 30 minute steady drive every week or two so the cleaning can finish.",
+ rr(294,194,68,88,28,"url(#xSh)")+'<rect x="294" y="194" width="68" height="88" rx="28" fill="url(#xEmb)"/>'+'<path d="M296 222h64M296 256h64" stroke="#6f6a60" stroke-width="3" fill="none"/>'+bolt(310,208,4)+bolt(346,268,4)+'<path d="M310 208Q300 190 290 176" stroke="#c9d0d6" stroke-width="2.5" fill="none"/>');
+P("hpump","High-pressure fuel pump","fu",1,["manifold"],
+ "Squeezes the diesel to as much as about 2,500 bar and sends it to the fuel rail. It is lubricated by the diesel itself, which is why petrol in the tank destroys it.",
+ "Low-pressure fuel line from the tank, steel pipe to the fuel rail. Driven by the engine.","",
+ '<circle cx="630" cy="300" r="17" fill="url(#xAl)" stroke="#08090a" stroke-width="1.5"/><circle cx="630" cy="300" r="7" fill="#3a4047"/>'+rr(618,318,24,14,3,"url(#xAlD)")+conn(640,322,14,10,"#46b36b"));
+P("egr","EGR valve and cooler","ex",1,[],
+ "Exhaust gas recirculation. It feeds a measured part of the exhaust back into the intake, cooled first, to lower the combustion temperature and with it the nitrogen oxides.",
+ "Exhaust side of the engine, coolant circuit, intake manifold.",
+ "On cars that only do short trips it can clog with soot. The engine warning light is the usual sign.",
+ rr(600,204,72,42,6,"url(#xAl)")+lines(fins(610,650,208,242,8),.25,1.5)+rr(660,196,24,24,4,"url(#xPl)")+conn(666,188,14,10,"#e88a2a"));
+P("throttle","Intake throttle","ai",1,[],
+ "A flap in the intake that the engine computer can close. A diesel does not need it to control power; it uses it to steer exhaust gas recirculation and to stop the engine smoothly.",
+ "Cold charge pipe in, intake manifold out. One electrical connector for its motor.","",
+ '<circle cx="640" cy="492" r="17" fill="url(#xAl)" stroke="#08090a" stroke-width="1.5"/><circle cx="640" cy="492" r="10" fill="#22252a"/><path d="M632 492h16" stroke="#c9a23c" stroke-width="2.5"/>'+rr(654,480,20,22,3,"url(#xPl)")+conn(658,472,13,10,"#f0c330"));
+P("manifold","Intake manifold","ai",0,[],
+ "A plastic chamber with four arms that hands out the fresh, cooled air evenly to the four cylinders.",
+ "Intake throttle at its front end, the four intake ports of the cylinder head, the EGR pipe.","",
+ each4(function(y){return rr(582,y-13,42,26,10,"url(#xPl)")})+rr(616,246,46,236,18,"url(#xPl)")+shine(622,252,12,224,6)+lines(rows(624,654,290,440,50),.3));
+P("oilfilter","Oil filter housing","en",1,[],
+ "Holds the paper oil filter that cleans the engine oil. The black cap is unscrewed at every oil service to change the filter.",
+ "Engine oil circuit, oil cooler.","A workshop job. Nothing to check here.",
+ kcap(562,540,15,"#1b1d20")+'<path d="M556 534h12v12h-12z" fill="#33383e" stroke="#000" stroke-width=".8"/>');
+P("thermo","Coolant pump and thermostat","co",1,[],
+ "The pump pushes coolant around the engine. The thermostat keeps it out of the radiator until the engine is warm, then holds it near 90 to 100 °C.",
+ "Upper radiator hose, engine block, heater circuit. The pump is driven by the belt.","",
+ rr(486,538,38,28,6,"url(#xAl)")+'<circle cx="506" cy="552" r="8" fill="#22252a" stroke="#8a9199" stroke-width="1.5"/>'+conn(488,530,13,9,"#3d8fe0"));
+P("sg","48 V starter-generator","el",1,[],
+ "The heart of the mild hybrid. It restarts the engine smoothly at traffic lights, charges the batteries when you slow down, and adds a short boost when you accelerate.",
+ "Drive belt, the thick 48 V cable from the 48 V battery, its own coolant lines.",
+ "Never touch the belt area with the engine running or the ignition on.",
+ rr(398,530,54,48,12,"url(#xAl)")+lines(fins(408,442,536,572,7),.25,1.5)+rr(414,576,24,14,2,"url(#xSt)")+'<rect x="400" y="520" width="24" height="11" rx="2" fill="#f0c330" stroke="#08090a"/><text x="412" y="529" font-size="8" font-weight="700" text-anchor="middle" fill="#1b1d20" font-family="sans-serif">48V</text>');
+P("accomp","A/C compressor","co",1,[],
+ "Compresses the refrigerant for the air conditioning. It only takes power from the belt when the A/C is on.",
+ "Drive belt, the two aluminium A/C pipes, the condenser at the front.","",
+ rr(596,544,52,36,8,"url(#xAlD)")+rr(606,576,26,14,2,"url(#xSt)")+conn(630,536,13,10,"#46b36b"));
+P("tension","Belt tensioner","en",1,[],
+ "A spring-loaded pulley that keeps the drive belt tight as it stretches with age.",
+ "Drive belt.","A chirp or squeal at start-up often means the belt or this tensioner is worn.",
+ rr(538,560,22,16,4,"url(#xAlD)")+rr(540,576,18,13,2,"url(#xSt)"));
+P("crank","Crankshaft pulley","en",1,[],
+ "The front end of the crankshaft. Everything the pistons produce turns this pulley, which drives the belt. It contains a rubber damper that smooths out vibrations.",
+ "Crankshaft inside the engine, drive belt.","",
+ rr(480,572,44,20,4,"url(#xSt)")+rr(486,576,32,12,2,"#22252a"));
+P("belt","Drive belt","en",0,[],
+ "One long ribbed rubber belt, seen here edge-on from above. It carries power from the crankshaft pulley to the starter-generator, the coolant pump and the A/C compressor.",
+ "Crankshaft pulley, starter-generator, tensioner, A/C compressor.",
+ "Changed by the workshop when cracked or noisy. Never touch it with the engine running.",
+ rr(410,580,228,7,3.5,"#0c0d0e","#34383d")+lines(fins(416,632,581,586,6),.5,1));
+P("condenser","A/C condenser","co",1,["radcover"],
+ "The front-most heat exchanger. Hot refrigerant from the A/C compressor gives its heat to the outside air here and turns liquid.",
+ "A/C compressor and the two aluminium A/C pipes.","Keep the grille free of leaves.",
+ '<rect x="250" y="667" width="500" height="12" fill="url(#xFin)" stroke="#08090a" stroke-width="1.5"/>');
+P("intercooler","Charge-air cooler","ai",1,["radcover"],
+ "Also called the intercooler. Air leaving the turbo is hot from being squeezed; this cools it again so more oxygen fits into each cylinder.",
+ "Hot charge pipe from the turbo on one side, cold charge pipe to the engine on the other.",
+ "A split hose here causes a hiss and a sudden loss of power.",
+ '<rect x="312" y="651" width="376" height="13" fill="url(#xFin)" stroke="#08090a" stroke-width="1.5"/>'+rr(288,649,26,17,3,"url(#xPl2)")+rr(686,649,26,17,3,"url(#xPl2)"));
+P("radiator","Radiator","co",1,["radcover"],
+ "Cools the engine coolant. Hot coolant flows through thin tubes while outside air passes over the fins.",
+ "Upper radiator hose from the engine, lower hose back to the coolant pump, a thin hose to the expansion tank.","",
+ '<rect x="256" y="632" width="488" height="15" fill="url(#xFin)" stroke="#08090a" stroke-width="1.5"/>'+rr(236,630,22,19,3,"url(#xPl2)")+rr(742,630,22,19,3,"url(#xPl2)"));
+P("fan","Electric fan and shroud","co",0,["radcover"],
+ "A large electric fan in a plastic frame. It pulls air through the radiators when the car is slow or standing.",
+ "Radiator, one thick electrical connector.",
+ "It can start by itself, even after the engine is off. Keep hands clear.",
+ rr(262,600,476,28,6,"url(#xPl2)")+lines(fins(280,720,604,624,22),.35)+'<circle cx="500" cy="614" r="11" fill="#33383e" stroke="#08090a"/>'+conn(540,604,18,12,"#e14b3b"));
+P("latch","Hood latches","bo",1,["radcover"],
+ "Two catches that lock the hood shut. That is why you pull the release lever twice: the first pull unlatches, the second releases the safety catch.",
+ "Release cable to the lever in the driver's footwell.","After closing the hood, check both sides are flush.",
+ rr(292,686,26,12,2,"url(#xSt)")+rr(682,686,26,12,2,"url(#xSt)")+'<circle cx="305" cy="692" r="3" fill="#111"/><circle cx="695" cy="692" r="3" fill="#111"/>');
+P("airbox","Air filter housing","ai",1,["airlid","airfilter"],
+ "The lower half of the air box. All the air the engine burns enters here.",
+ "Intake snorkel from the front, clean-air duct to the turbo.","Keep leaves and rags away from the intake.",
+ rr(150,410,166,152,14,"url(#xPl2)")+rr(160,420,146,132,8,"#0a0b0c"));
+P("airfilter","Air filter element","ai",0,["airlid"],
+ "A pleated paper filter that keeps dust out of the engine. When it clogs, the engine gets less air: less power, more fuel.",
+ "Sits loose in the air filter housing.","Changed by the workshop about every 60,000 km.",
+ rr(162,422,142,128,5,"#1b1d20")+'<rect x="170" y="430" width="126" height="112" fill="url(#xPleat)" stroke="#6b5f3c"/>');
+P("towers","Strut towers","bo",1,[],
+ "The tops of the front suspension. Each front spring and shock absorber is bolted to the body here.",
+ "Front suspension struts below, body shell.","Nothing to do. Rust or cracks here are a workshop matter.",
+ [205,795].map(function(x){return '<circle cx="'+x+'" cy="290" r="44" fill="url(#xPaintR)" stroke="#08090a" stroke-width="1.5"/><circle cx="'+x+'" cy="290" r="21" fill="#17191c" stroke="#000"/><circle cx="'+x+'" cy="290" r="9" fill="url(#xSt)"/>'+bolt(x,258,5)+bolt(x-28,306,5)+bolt(x+28,306,5)}).join(""));
+P("struts","Hood gas struts","bo",1,[],
+ "Two gas-filled struts that lift the hood and hold it open.",
+ "Hood on top, body at the bottom.","If the hood slowly sinks, the struts are worn.",
+ '<path d="M146 150L152 250M854 150L848 250" stroke="#0a0b0c" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M146 150L144 100M854 150L856 100" stroke="#d5dbe0" stroke-width="3.5" stroke-linecap="round" fill="none"/>'+bolt(152,252,4)+bolt(848,252,4)+bolt(144,98,4)+bolt(856,98,4));
+P("b48","48 V battery","el",1,["b48cover"],
+ "A small lithium-ion battery for the mild hybrid system. It stores the energy recovered when you slow down and feeds the starter-generator.",
+ "Thick 48 V cable to the starter-generator, a converter that also supports the 12 V system.",
+ "Maintenance-free. Leave it alone. Its position differs by build, so this is only a likely spot; your manual shows the exact place.",
+ rr(236,138,124,62,6,"url(#xAlD)")+lines(rows(246,320,186,194,8),.25,1.5)+'<rect x="248" y="148" width="42" height="18" rx="2" fill="#f0c330" stroke="#08090a"/><text x="269" y="161" font-size="11" font-weight="700" text-anchor="middle" fill="#1b1d20" font-family="sans-serif">48 V</text>'+conn(328,148,24,32,"#e88a2a"));
+P("jump","Jump-start terminal (plus)","el",1,["jumpflap"],
+ "Because the 12 V battery lives in the boot, BMW gives you a plus terminal under the hood for jump-starting or charging.",
+ "The thick red battery cable from the boot.",
+ "Jump leads: red to the dead car's plus, red to the donor's plus, black to the donor's minus, black to your earth point. Remove in reverse. On a mild hybrid, follow the manual exactly.",
+ rr(152,140,56,44,6,"#7c1a17")+'<circle cx="180" cy="162" r="11" fill="#d6a84a" stroke="#08090a" stroke-width="1.5"/><circle cx="180" cy="162" r="5" fill="#f4dc9a"/>');
+P("earth","Earth point (minus)","el",1,[],
+ "A bare metal nut on the body. It is the minus connection for jump leads.",
+ "The car's metal body, which is the return path for all 12 V circuits.",
+ "The last black clamp goes here, not on a battery.",
+ '<circle cx="176" cy="218" r="9" fill="url(#xSt)" stroke="#08090a" stroke-width="1.5"/><path d="M171 218h10" stroke="#111" stroke-width="2.5"/>');
+P("ecu","Engine control unit","el",1,["eculid"],
+ "The engine's computer (BMW calls it DDE). It reads dozens of sensors and decides, many times per second, how much fuel to inject and when.",
+ "The engine wiring harness plugs in with two large connectors.",
+ "It stores the fault codes a workshop reads out when a warning light comes on.",
+ rr(636,140,88,60,4,"url(#xAl)")+lines(fins(646,714,146,186,8),.22,1.5)+conn(644,190,32,15,"#3d8fe0")+conn(684,190,32,15,"#e14b3b"));
+P("brakeres","Brake fluid reservoir","bo",1,["brakecover"],
+ "Holds the hydraulic fluid that carries your pedal force to the brakes. The level sinks slowly as the pads wear. That is normal.",
+ "The brake unit right below it, which sends fluid through steel pipes to each wheel.",
+ "Look, do not touch. The level should sit between MIN and MAX. The fluid is changed by a workshop every two years. It damages paint and skin.",
+ rr(770,188,60,22,3,"url(#xAlD)")+rr(762,138,76,52,12,"url(#xTank)")+'<rect x="764" y="166" width="72" height="22" rx="8" fill="#d9a520" fill-opacity=".35"/>'+kcap(800,162,15,"url(#xYel)"));
+P("fusebox","Power distribution box","el",1,["fuselid"],
+ "Fuses and relays for the engine's circuits. A fuse melts before a cable can overheat; a relay is a switch that a small current uses to turn on a large one.",
+ "The red battery cable, the engine wiring harness.",
+ "Replace a fuse only with one of the same rating. The fuse card in the boot shows what each one protects.",
+ rr(650,318,92,72,6,"#141618")+(function(){var s="",c=["#e14b3b","#3d8fe0","#f0c330","#46b36b","#e88a2a"],k=0;for(var y=326;y<=354;y+=14)for(var x=658;x<=704;x+=11)s+='<rect x="'+x+'" y="'+y+'" width="8" height="10" rx="1" fill="'+c[(k++*2+y)%5]+'"/>';return s})()+rr(716,326,18,18,2,"#2b2f34")+rr(716,350,18,18,2,"#2b2f34")+rr(660,368,40,14,2,"#2b2f34"));
+P("cooltank","Coolant expansion tank","co",1,[],
+ "A reservoir for the engine coolant (water mixed with antifreeze). It gives the liquid room to expand as it heats up.",
+ "A thin hose to the radiator and a return hose to the engine.",
+ "Check the level only with the engine cold. Never open the cap when hot: the system is under pressure and can scald you. If the level drops again after a top-up, there is a leak.",
+ '<path d="M690 420q0-12 12-12h96q22 0 22 22v62q0 12-12 12h-106q-12 0-12-12z" fill="url(#xTank)" stroke="#08090a" stroke-width="1.5"/><path d="M692 462h126v30q0 10-10 10h-106q-10 0-10-10z" fill="#58aee0" fill-opacity=".4"/><path d="M768 414v86" stroke="#000" stroke-opacity=".15" stroke-width="2"/><path d="M790 452h18M790 480h18" stroke="#33383e" stroke-width="2"/>'+kcap(730,440,20,"#17191c")+'<path d="M730 430v10M730 446v2" stroke="#f0c330" stroke-width="3" stroke-linecap="round"/><circle cx="730" cy="440" r="13" fill="none" stroke="#f0c330" stroke-width="1.5"/>');
+P("washer","Washer fluid filler","bo",1,[],
+ "The filler neck for the windscreen washer fluid. The tank itself is hidden behind the wheel arch.",
+ "Washer tank and pump, hoses to the spray nozzles.",
+ "The one thing here you will refill regularly. Use ready-mixed washer fluid, with antifreeze in winter.",
+ rr(808,574,24,34,6,"url(#xPl2)")+kcap(820,582,17,"url(#xBlue)")+'<path d="M811 587q9-11 18 0zM820 587v-5" fill="none" stroke="#fff" stroke-width="1.6"/>');
+P("acpipes","A/C pipes","co",1,[],
+ "Two aluminium pipes that carry the refrigerant between the compressor, the condenser at the front and the cabin. The two small caps are the service ports.",
+ "A/C compressor, condenser, the evaporator behind the dashboard.",
+ "Never open the service caps: the system is under pressure.",
+ hose("M858 215V560Q858 664 752 673",5,"#c9d0d6")+hose("M848 240V540Q848 640 764 660",4,"#c9d0d6")+kcap(858,300,6.5,"#17191c")+kcap(848,345,6.5,"#17191c"));
+P("wiper","Wiper motor and linkage","bo",1,["cowl"],
+ "An electric motor and a set of rods that turn its rotation into the back-and-forth sweep of the two wiper arms.",
+ "Wiper arms above, one electrical connector.","",
+ '<path d="M300 92H700" stroke="#c9d0d6" stroke-width="4" fill="none"/>'+bolt(300,92,8)+bolt(700,92,8)+rr(604,76,60,32,9,"url(#xAlD)")+conn(650,82,16,12,"#3d8fe0"));
+P("cabhousing","Cabin air intake","bo",1,["cowl","cablid","cabfilter"],
+ "The opening where outside air enters the heating and air-conditioning system.",
+ "Blower fan and heater behind the dashboard.","Keep the cowl slots above it free of leaves.",
+ rr(410,70,180,46,6,"url(#xPl2)")+rr(418,76,164,34,3,"#07080a"));
+P("cabfilter","Cabin microfilter","bo",0,["cowl","cablid"],
+ "A pleated filter that catches pollen and dust before the air reaches you.",
+ "Sits in the cabin air intake.",
+ "Changed about every two years. A musty smell or weak airflow means it is overdue.",
+ '<rect x="420" y="78" width="160" height="30" fill="url(#xPleatW)" stroke="#5c636b"/>');
+P("c48","48 V cable","el",0,[],
+ "A thick, heavily insulated cable that carries the 48 V current between the 48 V battery and the starter-generator.",
+ "48 V battery at one end, starter-generator at the other.",
+ "Leave it alone. 48 V is below the high-voltage limit, but the currents are large.",
+ hose("M262 200V380Q262 398 280 398H322Q340 398 340 416V520Q340 548 398 556",8,"#30343a")+'<rect x="254" y="300" width="16" height="10" rx="2" fill="#f0c330"/><rect x="332" y="470" width="16" height="10" rx="2" fill="#f0c330"/>');
+P("hotpipe","Hot charge pipe","ai",0,[],
+ "Carries the air the turbo has just compressed, which is hot, down to the charge-air cooler at the front.",
+ "Turbo compressor outlet, left end of the charge-air cooler.",
+ "If its clamp slips off you hear a loud whoosh and lose power.",
+ hose("M392 372C394 430 384 520 384 590Q384 646 312 657",20,"#2a2d31")+'<path d="M380 400h22M374 560h22" stroke="#c9d0d6" stroke-width="3" fill="none"/>');
+P("coldpipe","Cold charge pipe","ai",0,[],
+ "Carries the cooled, compressed air from the charge-air cooler up to the intake throttle.",
+ "Right end of the charge-air cooler, intake throttle.","",
+ hose("M700 657Q668 646 668 600V540Q668 512 652 502",20,"#2a2d31")+'<path d="M657 560h22" stroke="#c9d0d6" stroke-width="3" fill="none"/>');
+P("upperhose","Upper radiator hose","co",0,[],
+ "A thick rubber hose that carries hot coolant from the engine to the radiator.",
+ "Thermostat housing on the engine, top of the radiator.",
+ "Hot and under pressure when the engine is warm. A bulging or soft hose should be replaced.",
+ hose("M508 556C520 610 570 598 596 634",16,"#1c1e21")+'<path d="M500 564h18" stroke="#c9d0d6" stroke-width="3" fill="none"/>');
+P("coolhose","Expansion tank hose","co",0,[],
+ "A thin hose that lets coolant and air bubbles move between the radiator and the expansion tank.",
+ "Coolant expansion tank, radiator.","",
+ hose("M720 502Q716 580 748 630",7,"#1c1e21"));
+P("injectors","Fuel injectors","fu",0,["cover","harness","rail"],
+ "One per cylinder. Each sprays a fine mist of diesel straight into the cylinder at exactly the right moment, several times per power stroke.",
+ "High-pressure pipes from the fuel rail, one electrical connector each, a thin return line.",
+ "A rough idle or diesel smell can point to an injector. Workshop only: the pressure is dangerous.",
+ each4(function(y){return '<circle cx="500" cy="'+y+'" r="10" fill="url(#xSt)" stroke="#08090a" stroke-width="1.5"/><rect x="494" y="'+(y-6)+'" width="12" height="12" rx="2" fill="#6f7780" stroke="#000" stroke-width=".8"/>'}));
+P("glow","Glow plugs","en",0,["cover"],
+ "Small electric heaters, one per cylinder. They warm the combustion chamber so the diesel ignites on a cold start.",
+ "A wire from the glow plug control unit links all four.",
+ "A preheating symbol that stays on means one has failed.",
+ '<path d="M440 275V470" stroke="#111" stroke-width="2.5" fill="none"/>'+each4(function(y){return bolt(440,y+13,5.5)+'<rect x="435" y="'+(y+8)+'" width="10" height="10" rx="2" fill="#17191c" stroke="#666b72" stroke-width=".8"/>'}));
+P("rail","Fuel rail and high-pressure pipes","fu",0,["cover"],
+ "The fuel rail is a thick steel tube that stores diesel at very high pressure, which is where the name common rail comes from. Four thin steel pipes lead from it to the injectors.",
+ "High-pressure pump (the pipe coming from the right), the four injectors, a pressure sensor at its end.",
+ "Never loosen anything here: the pressure can cut skin.",
+ '<path d="M553 300H614" stroke="#cfd5da" stroke-width="3.5" fill="none"/>'+each4(function(y){return '<path d="M540 '+(y+8)+'Q522 '+(y-10)+' 509 '+(y-3)+'" stroke="#08090a" stroke-width="5" fill="none"/><path d="M540 '+(y+8)+'Q522 '+(y-10)+' 509 '+(y-3)+'" stroke="#cfd5da" stroke-width="3" fill="none"/>'+bolt(540,y+8,4)})+rr(540,238,13,244,6,"url(#xSt)")+rr(541,224,11,15,2,"#17191c")+'<rect x="544" y="228" width="5" height="6" fill="#46b36b"/>');
+P("harness","Engine wiring harness","el",0,["cover"],
+ "A bundle of wires wrapped in black tape. It carries the commands from the engine control unit to each injector and brings sensor readings back. The grey plugs with coloured locking tabs are the connectors: each one clicks onto exactly one part and cannot be mixed up.",
+ "Engine control unit at one end; injectors, rail pressure sensor and other sensors at the other.",
+ "A connector that is not fully clicked in is a classic cause of a warning light after repairs.",
+ hose("M680 204C660 226 600 222 548 224Q470 224 470 250V478",9,"#141518")+hose("M548 224V230",4,"#141518")+each4(function(y,i){return hose("M470 "+y+"H488",5,"#141518")+conn(486,y-7,24,14,["#3d8fe0","#f0c330","#46b36b","#e14b3b"][i])}));
+P("shield","Heat shield","ex",0,[],
+ "A thin embossed metal sheet over the turbo and exhaust manifold. It keeps their heat away from hoses, cables and plastic parts.",
+ "Bolted to the exhaust manifold.","Never touch after driving. A buzzing rattle can be a loose shield.",
+ '<path d="M342 242Q342 232 352 232H410Q420 232 420 242V392Q420 402 410 402H352Q342 402 342 392Z" fill="url(#xSh)" stroke="#08090a" stroke-width="1.5"/><path d="M342 242Q342 232 352 232H410Q420 232 420 242V392Q420 402 410 402H352Q342 402 342 392Z" fill="url(#xEmb)"/>'+bolt(352,244,4)+bolt(410,244,4)+bolt(352,390,4)+bolt(410,390,4));
+P("cleanduct","Clean-air duct and air-mass sensor","ai",0,[],
+ "A ribbed hose that carries filtered air from the air box to the turbo. The small sensor plugged into it measures how much air is flowing, so the engine computer knows how much fuel it may inject.",
+ "Air filter housing, turbo compressor inlet, one connector to the wiring harness.",
+ "A dirty air-mass sensor causes weak pulling power and an engine warning light.",
+ hose("M316 442Q350 438 366 402",28,"#202327",1)+rr(320,420,22,14,3,"#17191c")+conn(324,408,15,12,"#3d8fe0"));
+P("snorkel","Intake snorkel","ai",0,[],
+ "A flat duct that picks up cool outside air behind the grille and leads it into the air box.",
+ "Front of the car, air filter housing.","Keep it free of leaves.",
+ '<path d="M196 560h72v40q0 10-10 16l-8 30h-40l-6-30q-8-8-8-16z" fill="url(#xPl2)" stroke="#08090a" stroke-width="1.5"/>'+lines("M210 572v30M232 572v30M254 572v30",.35));
+P("airlid","Air box lid","ai",0,[],
+ "The top of the air box. It is held by clips or screws and comes off to change the air filter.",
+ "Air filter housing below.",
+ "This is the large flat black box you see first on this side of the engine.",
+ rr(146,406,174,160,16,"url(#xPl)")+shine(156,412,154,20,10)+lines(rows(170,296,446,534,22),.3,3)+rr(140,440,10,20,2,"url(#xSt)")+rr(140,510,10,20,2,"url(#xSt)")+rr(316,470,10,20,2,"url(#xSt)")+rr(316,530,10,20,2,"url(#xSt)"));
+P("cover","Engine cover","tr",0,[],
+ "A big plastic cover with foam underneath. It is there for noise and looks, and hides almost everything interesting. It simply pulls off its rubber mounts.",
+ "Four rubber mounts on the engine.",
+ "On the real car, leave it on. Here, take it off first.",
+ '<path fill-rule="evenodd" d="M424 196H576Q598 196 598 218V526Q598 548 576 548H424Q402 548 402 526V218Q402 196 424 196ZM545 487a21 21 0 1 0 .01 0Z" fill="url(#xPl)" stroke="#08090a" stroke-width="1.5"/>'+
+ '<rect x="420" y="214" width="160" height="246" rx="14" fill="url(#xPl2)" stroke="#000" stroke-opacity=".5"/>'+[232,288,344,400].map(function(y){return '<rect x="436" y="'+y+'" width="128" height="34" rx="12" fill="url(#xPl)" stroke="#000" stroke-opacity=".45"/>'+shine(442,y+3,116,8,4)}).join("")+
+ '<circle cx="462" cy="506" r="17" fill="url(#xSt)" stroke="#08090a" stroke-width="1.5"/><circle cx="462" cy="506" r="11" fill="#22252a"/>'+shine(410,202,180,10,5));
+P("oilcap","Oil filler cap","en",0,[],
+ "Where engine oil is topped up. Your car has no dipstick: a sensor measures the level and shows it on the screen under CAR > Vehicle status > Engine oil level.",
+ "The filler neck on the cylinder head cover.",
+ "Top up only when the car asks, usually 1 litre at a time, with oil that carries the BMW Longlife approval named in your manual. Engine off. Never overfill.",
+ kcap(545,508,17,"#17191c")+'<g transform="translate(535.5 498.5) scale(.4)" fill="none" stroke="#f0c330" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">'+IC.oil+'</g>');
+P("earthstrap","Engine earth strap","el",0,[],
+ "A flat braided copper strap. The engine sits on rubber mounts, so this strap gives its electrical parts a solid return path to the body.",
+ "Engine and gearbox on one end, body on the other.",
+ "A corroded strap causes strange electrical faults and slow starting.",
+ hose("M566 166Q592 150 612 132",6,"#b9bfc5",1)+bolt(566,166,5)+bolt(612,132,5));
+P("poscable","Battery cable (plus)","el",0,[],
+ "The thick red cable that brings 12 V from the battery in the boot to the front of the car.",
+ "Jump-start terminal, power distribution box, and through the bulkhead to the battery in the boot.",
+ "Red always means plus.",
+ hose("M180 142V124H741V300Q741 314 722 318",7,"#b3261e"));
+P("b48cover","48 V battery cover","tr",0,[],
+ "A plastic cover that protects the 48 V battery and its connector.",
+ "Clipped over the 48 V battery.","Leave it on in real life.",
+ rr(230,132,136,74,10,"url(#xPl)")+shine(238,138,120,12,6)+lines(rows(250,346,166,190,12),.3,3)+'<path d="M342 142l8 14h-16z" fill="#f0c330" stroke="#08090a"/>');
+P("jumpflap","Jump-start flap","tr",0,[],
+ "A red plastic flap marked with a plus sign. It keeps the plus terminal from touching anything metal by accident.",
+ "Hinged over the jump-start terminal.","Flip it open to connect a jump lead or a charger.",
+ rr(148,136,64,52,8,"url(#xRed)")+'<path d="M180 150v24M168 162h24" stroke="#fff" stroke-width="5" stroke-linecap="round"/>'+shine(154,140,52,8,4));
+P("eculid","Control unit box lid","tr",0,[],
+ "The lid of a sealed box that keeps water and heat away from the engine control unit.",
+ "Clipped onto the electronics box.","",
+ rr(630,134,100,72,8,"url(#xPl)")+shine(638,140,84,10,5)+lines(rows(646,714,164,192,14),.3,3));
+P("brakecover","Brake reservoir cover","tr",0,[],
+ "A plastic trim piece over the brake fluid reservoir.",
+ "Clipped over the reservoir.","Lift it to see the MIN and MAX marks.",
+ rr(752,130,96,78,10,"url(#xPl)")+shine(760,136,80,10,5)+lines(rows(770,830,164,194,15),.3,3));
+P("fuselid","Power distribution box lid","tr",0,[],
+ "The lid of the fuse and relay box. Its underside usually carries a diagram of the fuses.",
+ "Clipped onto the power distribution box.","",
+ rr(646,314,100,80,8,"url(#xPl)")+shine(654,320,84,10,5)+rr(640,344,9,18,2,"url(#xSt)")+rr(743,344,9,18,2,"url(#xSt)")+lines("M664 350h64M664 366h64",.3,3));
+P("cablid","Cabin filter lid","tr",0,["cowl"],
+ "The lid over the cabin microfilter, held by a few clips.",
+ "Cabin air intake housing.","",
+ rr(408,68,184,50,7,"url(#xPl)")+shine(416,72,168,8,4)+rr(440,62,16,9,2,"url(#xSt)")+rr(492,62,16,9,2,"url(#xSt)")+rr(544,62,16,9,2,"url(#xSt)"));
+P("cowl","Cowl trim","tr",0,[],
+ "The black plastic panel at the base of the windscreen. Its slots let fresh air in for the cabin and let rain drain away.",
+ "Windscreen above, bulkhead below. A rubber seal along its edge meets the closed hood.",
+ "Keep the slots free of leaves.",
+ '<path d="M136 58H864L862 118H138Z" fill="url(#xPl)" stroke="#08090a" stroke-width="1.5"/>'+lines(fins(180,380,70,104,12)+fins(620,820,70,104,12),.45,4)+'<path d="M138 118H862" stroke="#050607" stroke-width="5" stroke-linecap="round"/>'+shine(140,60,720,8,0));
+P("radcover","Radiator top cover","tr",0,[],
+ "A plastic panel over the top of the radiators. It guides the air from the grille through the radiators instead of over them.",
+ "Clipped to the front panel.",
+ "Take it off here to see the stack of radiators underneath.",
+ '<path d="M200 596H800L806 640Q800 690 770 696H230Q200 690 194 640Z" fill="url(#xPl)" stroke="#08090a" stroke-width="1.5"/>'+lines(fins(300,700,612,676,50),.3,3)+shine(204,600,592,10,4)+bolt(240,612,4)+bolt(760,612,4)+bolt(500,612,4)+bolt(250,682,4)+bolt(750,682,4));
+
+var exById={},exGone={},exSel=null,exSeen=store.get("exseen",{}),exZ=1,exVB=[0,0,1000,760];
+function exG(id){return document.querySelector('#exFig g.pc[data-id="'+id+'"]')}
+function exBlockers(id){var out=[];(function walk(i){exById[i].under.forEach(function(u){if(out.indexOf(u)<0){walk(u);out.push(u)}})})(id);return out.filter(function(u){return !exGone[u]})}
+function exPaint(){
+  EX.forEach(function(p){var g=exG(p.id);g.setAttribute("filter","url(#"+(p.id===exSel?"xGlw":"xShd")+")");g.classList.toggle("gone",!!exGone[p.id])});
+  var gone=EX.filter(function(p){return exGone[p.id]});
+  $("#exTray").innerHTML=gone.length?'<span class="small">Removed ('+gone.length+'), tap to put back:</span>'+gone.map(function(p){return '<button class="chipbtn" data-back="'+p.id+'">'+esc(p.name)+'</button>'}).join(""):'<span class="small">Nothing removed yet. Start with the engine cover in the middle.</span>';
+  document.querySelectorAll("#exList button").forEach(function(b){var id=b.getAttribute("data-id");b.classList.toggle("sel",id===exSel);b.classList.toggle("seen",!!exSeen[id]);b.classList.toggle("off",!!exGone[id])});
+  $("#exCount").textContent="You have looked at "+Object.keys(exSeen).filter(function(k){return exById[k]}).length+" of "+EX.length+" parts.";
+}
+function exInfo(){
+  var p=exById[exSel];
+  if(!p){$("#exInfo").innerHTML='<div class="stack"><h3>Point at a part</h3><p>Move the mouse over anything in the drawing to see its name and what it does. Click it to take it off. On a phone, tap a part and use the Remove button here.</p><p class="small">Cables, hoses and connectors count as parts too. Parts with a question-mark cursor stay in place: they are the bare engine.</p></div>';return}
+  var bl=exBlockers(p.id),gone=!!exGone[p.id];
+  var st=p.fix?'<span class="pill">Stays in place</span>':gone?'<span class="pill amber">Removed</span>':'<span class="pill green">Removable</span>';
+  $("#exInfo").innerHTML='<div class="stack"><h3>'+esc(p.name)+'</h3><div class="row"><span class="pill info">'+SYS[p.sys]+'</span>'+st+'</div><dl class="sheet">'+
+    '<div><dt>What it does</dt><dd>'+esc(p.d)+'</dd></div><div><dt>Connected to</dt><dd>'+esc(p.c)+'</dd></div>'+
+    (p.you?'<div><dt>Good to know</dt><dd>'+esc(p.you)+'</dd></div>':'')+'</dl>'+
+    (bl.length&&!gone?'<p class="note">Hidden under: '+bl.map(function(u){return esc(exById[u].name)}).join(", ")+'.</p>':'')+
+    '<div class="row">'+(bl.length&&!gone?'<button class="btn primary" data-act="reveal">Show me</button>':'')+
+    (p.fix?'':gone?'<button class="btn primary" data-act="back">Put it back</button>':'<button class="btn'+(bl.length?'':' primary')+'" data-act="remove">Remove it</button>')+'</div></div>';
+}
+function exSelect(id){if(id===exSel)return;exSel=id;if(id){exSeen[id]=1;store.set("exseen",exSeen)}exPaint();exInfo()}
+function exRemove(id){var p=exById[id];if(!p||p.fix||exGone[id])return;exGone[id]=1;exSel=id;exSeen[id]=1;store.set("exseen",exSeen);
+  var g=exG(id);g.classList.add("leaving");setTimeout(function(){g.classList.remove("leaving");exPaint()},230);exInfo();$("#exTip").hidden=true}
+function exBack(id){delete exGone[id];exSel=id;exPaint();exInfo();exPulse(id)}
+function exPulse(id){var g=exG(id);g.classList.remove("pulse");void g.getBoundingClientRect();g.classList.add("pulse");setTimeout(function(){g.classList.remove("pulse")},1600)}
+function exReveal(id){exBlockers(id).forEach(function(u){exGone[u]=1});delete exGone[id];exSel=id;exSeen[id]=1;store.set("exseen",exSeen);exPaint();exInfo();exPulse(id);
+  $("#exFig").scrollIntoView({block:"nearest",behavior:"smooth"})}
+function exView(){var s=$("#exFig svg");s.setAttribute("viewBox",exVB.join(" "));s.classList.toggle("zoomed",exZ>1)}
+function exZoom(z){var cx=exVB[0]+exVB[2]/2,cy=exVB[1]+exVB[3]/2;exZ=Math.max(1,Math.min(4,z));var w=1000/exZ,h=760/exZ;
+  exVB=[Math.max(0,Math.min(1000-w,cx-w/2)),Math.max(0,Math.min(760-h,cy-h/2)),w,h];exView()}
+function initEx(){
+  EX.forEach(function(p){exById[p.id]=p});
+  var s='<svg class="exsvg" viewBox="0 0 1000 760" role="img" aria-label="Top view of the engine bay. Every part can be pointed at for its name and function, and most can be removed to show what is underneath.">'+EX_DEFS+EX_BASE;
+  EX.forEach(function(p){s+='<g class="pc'+(p.fix?' fix':'')+'" data-id="'+p.id+'">'+p.s+'</g>'});
+  $("#exFig").innerHTML=s+'</svg><div class="extip" id="exTip" hidden></div>';
+  var groups="";Object.keys(SYS).forEach(function(k){groups+='<h4>'+SYS[k]+'</h4><div class="partlist">'+EX.filter(function(p){return p.sys===k}).sort(function(a,b){return a.name<b.name?-1:1}).map(function(p){return '<button data-id="'+p.id+'"><b></b>'+esc(p.name)+'</button>'}).join("")+'</div>'});
+  $("#exList").innerHTML=groups;
+  var svg=$("#exFig svg"),fig=$("#exFig"),tip=$("#exTip"),pd=null,dragged=false,ptype="mouse";
+  svg.addEventListener("pointerdown",function(e){ptype=e.pointerType||"mouse";pd={x:e.clientX,y:e.clientY,vb:exVB.slice(),moved:false}});
+  svg.addEventListener("pointermove",function(e){
+    if(pd){var dx=e.clientX-pd.x,dy=e.clientY-pd.y;if(!pd.moved&&Math.abs(dx)+Math.abs(dy)>8)pd.moved=true;
+      if(pd.moved&&exZ>1){var k=exVB[2]/svg.clientWidth;exVB[0]=Math.max(0,Math.min(1000-exVB[2],pd.vb[0]-dx*k));exVB[1]=Math.max(0,Math.min(760-exVB[3],pd.vb[1]-dy*k));exView();tip.hidden=true}
+      return}
+    if(e.pointerType!=="mouse")return;
+    var g=e.target.closest("g.pc");if(!g){tip.hidden=true;return}
+    var p=exById[g.getAttribute("data-id")],r=fig.getBoundingClientRect();
+    exSelect(p.id);
+    tip.textContent=p.name+(p.fix?"":" · click to remove");tip.hidden=false;
+    var x=e.clientX-r.left+14,y=e.clientY-r.top+16;if(x+tip.offsetWidth>r.width-4)x=e.clientX-r.left-tip.offsetWidth-10;
+    tip.style.left=Math.max(4,x)+"px";tip.style.top=y+"px";
   });
-  var c=Object.keys(seen).length;$("#seenCount").textContent="Explored "+c+" of "+parts.length+" parts.";
+  svg.addEventListener("pointerleave",function(){tip.hidden=true});
+  window.addEventListener("pointerup",function(){if(pd){dragged=pd.moved;pd=null}});
+  window.addEventListener("pointercancel",function(){pd=null;dragged=false});
+  svg.addEventListener("click",function(e){if(dragged){dragged=false;return}
+    var g=e.target.closest("g.pc");if(!g)return;var id=g.getAttribute("data-id");
+    if(ptype==="mouse"&&!exById[id].fix)exRemove(id);else{exSel=null;exSelect(id)}});
+  $("#exInfo").addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(!b||!exSel)return;var a=b.getAttribute("data-act");
+    if(a==="remove")exRemove(exSel);else if(a==="back")exBack(exSel);else exReveal(exSel)});
+  $("#exTray").addEventListener("click",function(e){var b=e.target.closest("[data-back]");if(b)exBack(b.getAttribute("data-back"))});
+  $("#exList").addEventListener("click",function(e){var b=e.target.closest("[data-id]");if(!b)return;var id=b.getAttribute("data-id");
+    if(exBlockers(id).length||exGone[id]){exSel=id;exSeen[id]=1;store.set("exseen",exSeen);exPaint();exInfo()}else{exSel=null;exSelect(id);exPulse(id)}
+    $("#exInfo").scrollIntoView({block:"nearest",behavior:"smooth"})});
+  $("#exSearch").addEventListener("input",function(){var q=this.value.trim().toLowerCase();
+    document.querySelectorAll("#exList button").forEach(function(b){b.hidden=!!q&&b.textContent.toLowerCase().indexOf(q)<0});
+    document.querySelectorAll("#exList h4").forEach(function(h){var any=false;h.nextElementSibling.querySelectorAll("button").forEach(function(b){if(!b.hidden)any=true});h.hidden=!any;h.nextElementSibling.hidden=!any})});
+  $("#exZin").onclick=function(){exZoom(exZ*1.5)};$("#exZout").onclick=function(){exZoom(exZ/1.5)};
+  $("#exReset").onclick=function(){exGone={};exZ=1;exVB=[0,0,1000,760];exView();exPaint();exInfo()};
+  $("#exStrip").onclick=function(){EX.forEach(function(p){if(!p.fix)exGone[p.id]=1});exPaint();exInfo()};
+  exPaint();exInfo();
 }
 
 /* ---------- four-stroke simulation ---------- */
@@ -810,18 +1136,18 @@ function buildFlow(id,det,data,vb,base,top,label){
 
 /* ---------- warning lights ---------- */
 var lights=[
- {c:"red",i:"oil",n:"Engine oil pressure",part:"Oil pump, oil level (engine bay part 2)",mean:"Oil is not reaching the engine at enough pressure. Metal parts can destroy each other within seconds to minutes.",act:"Stop as soon as it is safe and switch the engine off. Do not restart. Call BMW roadside assistance or your breakdown service.",drive:"No"},
- {c:"red",i:"temp",n:"Engine overheating",part:"Cooling system: coolant tank (part 3), radiator and fan (part 9), water pump",mean:"Coolant is too hot. The engine can warp or seize.",act:"Stop safely, switch off, let it cool for at least 30 minutes. Do not open the coolant cap while hot. If the level is low once cold, top up and drive to a workshop; if unsure, get towed.",drive:"No"},
- {c:"red",i:"batt",n:"Battery not charging",part:"Starter-generator and belt (part 10), 12 V battery in the boot",mean:"The battery is no longer being charged. The car runs on stored energy only and will eventually stop.",act:"Switch off heavy consumers such as seat heating and rear demister. Drive directly to a workshop or a safe place. Do not switch the engine off until you are there: it may not restart.",drive:"Short distance only"},
- {c:"red",i:"brake",n:"Brake system",part:"Brake fluid reservoir (part 5), brake hydraulics",mean:"Brake fluid is low or there is a fault in the brake system. If it lights together with a soft or long pedal, braking power is reduced.",act:"First check that the parking brake is released. If it stays on, stop carefully and call for assistance. Do not just top up: a falling level means worn pads or a leak.",drive:"No"},
+ {c:"red",i:"oil",n:"Engine oil pressure",part:"Oil pump, oil level",mean:"Oil is not reaching the engine at enough pressure. Metal parts can destroy each other within seconds to minutes.",act:"Stop as soon as it is safe and switch the engine off. Do not restart. Call BMW roadside assistance or your breakdown service.",drive:"No"},
+ {c:"red",i:"temp",n:"Engine overheating",part:"Cooling system: coolant tank, radiator and fan, water pump",mean:"Coolant is too hot. The engine can warp or seize.",act:"Stop safely, switch off, let it cool for at least 30 minutes. Do not open the coolant cap while hot. If the level is low once cold, top up and drive to a workshop; if unsure, get towed.",drive:"No"},
+ {c:"red",i:"batt",n:"Battery not charging",part:"Starter-generator and belt, 12 V battery in the boot",mean:"The battery is no longer being charged. The car runs on stored energy only and will eventually stop.",act:"Switch off heavy consumers such as seat heating and rear demister. Drive directly to a workshop or a safe place. Do not switch the engine off until you are there: it may not restart.",drive:"Short distance only"},
+ {c:"red",i:"brake",n:"Brake system",part:"Brake fluid reservoir, brake hydraulics",mean:"Brake fluid is low or there is a fault in the brake system. If it lights together with a soft or long pedal, braking power is reduced.",act:"First check that the parking brake is released. If it stays on, stop carefully and call for assistance. Do not just top up: a falling level means worn pads or a leak.",drive:"No"},
  {c:"red",i:"park",n:"Parking brake applied",part:"Electric parking brake at the rear wheels",mean:"The parking brake is on. Normal when parked.",act:"Release it with the P switch while pressing the brake pedal. If the symbol turns yellow, the parking brake has a fault: have it checked.",drive:"Yes, once released"},
  {c:"red",i:"airbag",n:"Airbag and restraint system",part:"Airbags, belt tensioners, crash sensors",mean:"A fault in the system. Airbags may not fire in a crash.",act:"The car drives normally, but book a workshop visit soon. Make sure all belts are fastened.",drive:"Yes, get it checked"},
  {c:"red",i:"belt",n:"Seat belt reminder",part:"Belt buckle sensors",mean:"Someone is not buckled up, or a heavy bag sits on a seat.",act:"Fasten the belt. Move heavy items off the passenger seat.",drive:"After fastening"},
  {c:"red",i:"steer",n:"Steering fault (red)",part:"Electric power steering",mean:"Power steering has failed. The wheel becomes very heavy. In yellow, assistance is reduced.",act:"Red: stop safely and call assistance. Yellow: drive carefully to a workshop.",drive:"Red: no"},
  {c:"amber",i:"engine",n:"Engine warning (emissions)",part:"Engine management: sensors, injection, EGR, DPF, AdBlue system",mean:"The engine computer has stored a fault that affects emissions. Steady light: not an emergency. Flashing: misfire that can damage the exhaust cleaning.",act:"Steady: drive moderately and have the fault memory read within days. Flashing: reduce load at once and go straight to a workshop. Check the fuel cap clicked shut after refuelling.",drive:"Carefully"},
- {c:"amber",i:"gear",n:"Drivetrain malfunction",part:"Engine, turbo (part 8), gearbox, 48 V system",mean:"BMW's general message for a powertrain fault. The car often limits power to protect itself (limp mode).",act:"Avoid hard acceleration. Stop, switch off, wait a minute and restart: if it clears and returns later, still have it read out. If power stays low, go to a workshop.",drive:"Carefully"},
- {c:"amber",i:"oil",n:"Engine oil level low",part:"Oil filler (part 2), oil level sensor",mean:"The oil level is at minimum. This is the yellow version of the oil can: a top-up request, not a pressure emergency.",act:"Add 1 litre of approved oil at the next fuel stop, engine off. Measure again on the screen after a short drive. Keep a 1 litre bottle in the boot.",drive:"Yes, top up soon"},
- {c:"amber",i:"coolant",n:"Coolant level low",part:"Coolant expansion tank (part 3)",mean:"The coolant level has dropped to minimum.",act:"Let the engine cool completely, then check the tank and top up to MAX with approved coolant. If it happens again, there is a leak.",drive:"Short distance, watch temperature"},
+ {c:"amber",i:"gear",n:"Drivetrain malfunction",part:"Engine, turbo, gearbox, 48 V system",mean:"BMW's general message for a powertrain fault. The car often limits power to protect itself (limp mode).",act:"Avoid hard acceleration. Stop, switch off, wait a minute and restart: if it clears and returns later, still have it read out. If power stays low, go to a workshop.",drive:"Carefully"},
+ {c:"amber",i:"oil",n:"Engine oil level low",part:"Oil filler, oil level sensor",mean:"The oil level is at minimum. This is the yellow version of the oil can: a top-up request, not a pressure emergency.",act:"Add 1 litre of approved oil at the next fuel stop, engine off. Measure again on the screen after a short drive. Keep a 1 litre bottle in the boot.",drive:"Yes, top up soon"},
+ {c:"amber",i:"coolant",n:"Coolant level low",part:"Coolant expansion tank",mean:"The coolant level has dropped to minimum.",act:"Let the engine cool completely, then check the tank and top up to MAX with approved coolant. If it happens again, there is a leak.",drive:"Short distance, watch temperature"},
  {c:"amber",i:"tyre",n:"Tyre pressure (TPM)",part:"Pressure sensors inside each wheel",mean:"At least one tyre has lost pressure, or pressures were not reset after a tyre change.",act:"Slow down, avoid hard steering, and check all four at a fuel station. Pressures are on the sticker in the driver's door pillar. After correcting, run the reset under CAR &gt; Vehicle status &gt; Tyre Pressure Monitor. A fast loss means a puncture: your car likely has no spare, so use the mobility kit or call assistance.",drive:"Slowly to the next air pump"},
  {c:"amber",i:"abs",n:"ABS fault",part:"Wheel speed sensors, ABS control unit",mean:"Anti-lock braking is off. Normal braking still works, but wheels can lock in an emergency stop.",act:"Drive with more distance, brake gently, visit a workshop. Often a dirty or failed wheel speed sensor.",drive:"Yes, carefully"},
  {c:"amber",i:"dsc",n:"DSC stability control",part:"DSC control unit, wheel speed and steering sensors",mean:"Flashing: DSC is actively working because the road is slippery. That is normal. Steady: DSC is switched off or faulty.",act:"Flashing: ease off the throttle. Steady: check you did not press the DSC OFF button; otherwise drive carefully and have it checked.",drive:"Yes, carefully"},
@@ -830,7 +1156,7 @@ var lights=[
  {c:"amber",i:"glow",n:"Preheating (glow plugs)",part:"Glow plugs in each cylinder",mean:"On a very cold start the engine preheats briefly. If the symbol or a preheating message stays on while driving, a glow plug or its control unit is faulty.",act:"Wait for it to go out before starting in deep cold. If it stays, cold starts get rough: have it checked.",drive:"Yes"},
  {c:"amber",i:"fuel",n:"Fuel reserve",part:"Fuel tank",mean:"Roughly 50 to 80 km of range left.",act:"Refuel with diesel. Do not run a diesel dry: the injection system can draw air and may need bleeding.",drive:"Yes, refuel"},
  {c:"amber",i:"service",n:"Service due",part:"Condition Based Service",mean:"A service item has reached its date or distance.",act:"Open CAR &gt; Vehicle status &gt; Service requirements to see which item, then book it.",drive:"Yes"},
- {c:"amber",i:"washer",n:"Washer fluid low",part:"Washer fluid filler (part 4)",mean:"About a litre left.",act:"Refill with ready-mixed washer fluid.",drive:"Yes"},
+ {c:"amber",i:"washer",n:"Washer fluid low",part:"Washer fluid filler",mean:"About a litre left.",act:"Refill with ready-mixed washer fluid.",drive:"Yes"},
  {c:"green",i:"frost",n:"Outside temperature warning",part:"Outside temperature sensor",mean:"A chime and snowflake at about +3 °C and below: black ice is possible, especially on bridges.",act:"Drive smoothly and leave more distance.",drive:"Yes"}
 ];
 var lf="all",curLight=0;
@@ -928,7 +1254,7 @@ function drawQuiz(){
   };
 }
 
-drawCar();drawBay();showPart(1);initSim();
+drawCar();initEx();initSim();
 buildFlow("#flow","#flowDetail",air,"0 0 960 368",AIR_BASE,"","The path of the air from the air filter through the turbo, cooler and cylinders, then as exhaust through the turbine, filter and catalyst to the tailpipe");
 buildFlow("#power","#powerDetail",pow,"0 0 960 300",POW_BASE,POW_TOP,"Top view of the car showing power going from the engine through the gearbox and propshaft to the rear wheels");
 initLights();initMaint();drawQuiz();route();
