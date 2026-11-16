@@ -1,0 +1,4 @@
+.DS_Store
+my320d/build/
+my320d/*.tar.gz
+my320d/pi.env

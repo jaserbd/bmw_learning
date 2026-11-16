@@ -1,0 +1,936 @@
+<title>My 320d Under the Hood</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My 320d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: workshop manual with cutaway plates. Sticky section tabs, a tappable drawing on the left, a spec-sheet panel with a close-up of the part on the right; stacks to one column on a phone. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#e3e8ee; --ink:#16212c; --muted:#566675; --line:#c9d2dc;
+  --accent:#0b5cad; --accent-ink:#ffffff; --metal:#9aa7b4; --metal-2:#c4cdd6;
+  --red:#c42b2b; --amber:#b87400; --green:#1f8a4c; --red-bg:#fbe6e6; --amber-bg:#fbf0d9; --green-bg:#e1f3e8;
+  /* drawing colours: one hue per system of the car */
+  --steel:#c3ccd5; --steel-2:#7f8d9a; --plastic:#46525e; --plastic-2:#252e37; --rubber:#2d3640;
+  --hot:#d2571e; --cool:#2a8fd6; --drive:#7256c9; --glass:#d3e4f0;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10161c; --surface:#19222b; --surface-2:#222e39; --ink:#e7edf3; --muted:#9aaab9; --line:#33424f;
+    --accent:#5aa9f2; --accent-ink:#08131d; --metal:#5d6c7a; --metal-2:#3c4a57;
+    --red:#ff7a70; --amber:#f2b445; --green:#5fd08c; --red-bg:#3a1c1c; --amber-bg:#3a2e14; --green-bg:#163324;
+    --steel:#5b6976; --steel-2:#9babb9; --plastic:#2c3843; --plastic-2:#70808f; --rubber:#6a7a89;
+    --hot:#f08a4b; --cool:#5fb6f0; --drive:#a892f5; --glass:#20364a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10161c; --surface:#19222b; --surface-2:#222e39; --ink:#e7edf3; --muted:#9aaab9; --line:#33424f;
+  --accent:#5aa9f2; --accent-ink:#08131d; --metal:#5d6c7a; --metal-2:#3c4a57;
+  --red:#ff7a70; --amber:#f2b445; --green:#5fd08c; --red-bg:#3a1c1c; --amber-bg:#3a2e14; --green-bg:#163324;
+  --steel:#5b6976; --steel-2:#9babb9; --plastic:#2c3843; --plastic-2:#70808f; --rubber:#6a7a89;
+  --hot:#f08a4b; --cool:#5fb6f0; --drive:#a892f5; --glass:#20364a;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.1;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:2rem} h2{font-size:1.6rem} h3{font-size:1.25rem}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{padding-block:20px 12px}
+.plate{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline}
+.plate .sub{color:var(--muted);font-size:.95rem}
+.specs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-size:.8rem;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:2px 8px;color:var(--muted)}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:2px solid var(--line)}
+nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto}
+nav.tabs a{font-family:var(--display);font-size:1.1rem;font-weight:600;text-decoration:none;color:var(--muted);padding:10px 12px;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px}
+nav.tabs a[aria-current="page"]{color:var(--accent);border-bottom-color:var(--accent)}
+main{padding-block:20px 56px}
+section.view{display:none;flex-direction:column;gap:18px}
+section.view.on{display:flex}
+.lead{max-width:65ch;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.note{border-left:4px solid var(--accent);background:var(--surface-2);padding:10px 12px;border-radius:0 4px 4px 0;font-size:.93rem}
+.note.warn{border-left-color:var(--amber)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:8px 12px;font-weight:500}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+dl.sheet{display:grid;grid-template-columns:1fr;gap:10px;margin:0}
+dl.sheet dt{font-family:var(--display);font-weight:600;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+dl.sheet dd{margin:2px 0 0}
+.pill{display:inline-block;font-size:.78rem;font-weight:600;border-radius:999px;padding:2px 10px;border:1px solid currentColor}
+.pill.red{color:var(--red);background:var(--red-bg)} .pill.amber{color:var(--amber);background:var(--amber-bg)} .pill.green{color:var(--green);background:var(--green-bg)}
+.small{font-size:.85rem;color:var(--muted)}
+
+/* ---------- drawings: shared ink ---------- */
+svg{max-width:100%;height:auto;display:block}
+.fig{overflow-x:auto;margin:0}
+.fig svg{min-width:720px;max-width:none;width:100%}
+.swipe{display:none;font-size:.85rem;color:var(--accent);font-weight:500}
+@media (max-width:780px){.swipe{display:block}}
+@media (max-width:600px){.specs{flex-wrap:nowrap;overflow-x:auto}.chip{white-space:nowrap}.strokebar div{font-size:.8rem}}
+.i-st{fill:var(--steel);stroke:var(--steel-2);stroke-width:1.5;stroke-linejoin:round}
+.i-pl{fill:var(--plastic);stroke:var(--plastic-2);stroke-width:1.5;stroke-linejoin:round}
+.i-hot{fill:color-mix(in srgb,var(--hot) 55%,var(--surface));stroke:var(--hot);stroke-width:1.5;stroke-linejoin:round}
+.i-cool{fill:color-mix(in srgb,var(--cool) 55%,var(--surface));stroke:var(--cool);stroke-width:1.5;stroke-linejoin:round}
+.i-el{fill:color-mix(in srgb,var(--amber) 55%,var(--surface));stroke:var(--amber);stroke-width:1.5;stroke-linejoin:round}
+.i-fu{fill:color-mix(in srgb,var(--green) 50%,var(--surface));stroke:var(--green);stroke-width:1.5;stroke-linejoin:round}
+.i-dr{fill:color-mix(in srgb,var(--drive) 50%,var(--surface));stroke:var(--drive);stroke-width:1.5;stroke-linejoin:round}
+.i-red{fill:color-mix(in srgb,var(--red) 70%,var(--surface));stroke:var(--red);stroke-width:1.5;stroke-linejoin:round}
+.i-gl{fill:color-mix(in srgb,var(--steel) 35%,var(--surface));stroke:var(--steel-2);stroke-width:1.5}
+.i-liq{stroke:none;fill-opacity:.55}
+.i-ln{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round}
+.i-thin{fill:none;stroke:var(--steel-2);stroke-width:1.5;stroke-linecap:round}
+.i-fin{fill:none;stroke:var(--cool);stroke-width:1.2;stroke-opacity:.8}
+.i-grid{fill:none;stroke:var(--hot);stroke-width:1}
+.i-duct{fill:none;stroke:var(--plastic);stroke-width:16;stroke-linecap:round}
+.i-belt{fill:none;stroke:var(--plastic-2);stroke-width:5;stroke-linejoin:round}
+.i-cable{fill:none;stroke:var(--hot);stroke-width:5;stroke-linecap:round}
+.i-cal{fill:none;stroke:var(--red);stroke-width:11;stroke-linecap:round}
+.i-spray{fill:none;stroke:var(--cool);stroke-width:2;stroke-linecap:round}
+.i-sym{fill:none;color:var(--amber);stroke:var(--amber);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.i-symw{fill:none;color:var(--accent-ink);stroke:var(--accent-ink);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.i-tx{font-family:var(--body);font-size:11px;font-weight:500;fill:var(--muted)}
+.i-txw{font-family:var(--body);font-size:11px;font-weight:600;fill:var(--accent-ink)}
+.picbox{margin:0;background:var(--surface-2);border-radius:6px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.picbox svg{width:100%;max-width:300px}
+.picbox figcaption{font-size:.8rem;color:var(--muted)}
+
+/* ---------- whole car ---------- */
+.car .cb{fill:var(--surface-2);stroke:var(--metal);stroke-width:2.5;stroke-linejoin:round}
+.car .glass{fill:var(--glass);stroke:var(--metal);stroke-width:1.5;stroke-linejoin:round}
+.car .pillar{fill:none;stroke:var(--surface-2);stroke-width:9}
+.car .ghost{fill:none;stroke:var(--metal);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:.7}
+.car .lamp{fill:var(--glass);stroke:var(--metal);stroke-width:1.5}
+.car .lamp.rear{fill:var(--red);fill-opacity:.55}
+.car .shadow{fill:var(--ink);fill-opacity:.08}
+.car .tyre{fill:none;stroke:var(--rubber);stroke-width:18;stroke-opacity:.3}
+.car .rim{fill:none;stroke:var(--metal);stroke-width:1.5}
+.car .pipe{fill:none;stroke:var(--hot);stroke-width:6;stroke-linecap:round;stroke-linejoin:round}
+.car .hit{fill:transparent;stroke:none}
+.car g.p,.car g.lbl{cursor:pointer;transition:opacity .15s}
+.car g.lbl text{font-family:var(--body);font-size:14px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.car g.lbl line{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.car g.lbl circle{fill:var(--ink)}
+.car.focus g.p:not(.sel){opacity:.28}
+.car.focus g.lbl:not(.sel){opacity:.4}
+.car g.lbl.sel text{fill:var(--accent)}
+.car g.lbl.sel line{stroke:var(--accent);stroke-dasharray:none;stroke-width:1.5}
+.car g.lbl.sel circle{fill:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.85rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:14px;border-radius:3px;border:1.5px solid;display:inline-block}
+.lg-en{background:var(--steel);border-color:var(--steel-2)}
+.lg-dr{background:color-mix(in srgb,var(--drive) 50%,var(--surface));border-color:var(--drive)}
+.lg-ex{background:color-mix(in srgb,var(--hot) 55%,var(--surface));border-color:var(--hot)}
+.lg-co{background:color-mix(in srgb,var(--cool) 55%,var(--surface));border-color:var(--cool)}
+.lg-el{background:color-mix(in srgb,var(--amber) 55%,var(--surface));border-color:var(--amber)}
+.lg-fu{background:color-mix(in srgb,var(--green) 50%,var(--surface));border-color:var(--green)}
+.lg-br{background:color-mix(in srgb,var(--red) 70%,var(--surface));border-color:var(--red)}
+
+/* ---------- engine bay ---------- */
+.bay text{font-family:var(--body);fill:var(--muted);font-size:11px}
+.bay .body{fill:var(--surface-2);stroke:var(--metal);stroke-width:2}
+.bay .tower{fill:none;stroke:var(--metal);stroke-width:2;stroke-opacity:.7}
+.bay .strut{fill:none;stroke:var(--plastic-2);stroke-width:5;stroke-linecap:round}
+.bay g.hot{cursor:pointer}
+.bay g.hot .num{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.bay g.hot .numt{fill:var(--accent);font-family:var(--display);font-weight:700;font-size:14px;text-anchor:middle}
+.bay g.hot.sel .shape{filter:drop-shadow(0 0 3px var(--accent)) drop-shadow(0 0 1px var(--accent))}
+.bay g.hot.sel .num{fill:var(--accent)} .bay g.hot.sel .numt{fill:var(--accent-ink)}
+.bay g.hot.seen .num{stroke:var(--green)}
+.partlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px}
+.partlist button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:6px 8px;font-size:.9rem;display:flex;gap:8px;align-items:center}
+.partlist button b{font-family:var(--display);color:var(--accent);min-width:1.2em}
+.partlist button.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.partlist button.seen b::after{content:" ✓";color:var(--green)}
+
+/* ---------- flow drawings ---------- */
+.flowsvg .tube{fill:none;stroke-width:14;stroke-linecap:round}
+.flowsvg .t-cool{stroke:var(--cool)} .flowsvg .t-warm{stroke:var(--amber)} .flowsvg .t-hot{stroke:var(--hot)} .flowsvg .t-clean{stroke:var(--steel-2)}
+.flowsvg .t-drive{fill:none;stroke:var(--drive);stroke-width:4}
+.flowsvg .dash{fill:none;stroke:var(--surface);stroke-width:3;stroke-dasharray:4 14;stroke-linecap:round;animation:dash 1.1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-18}}
+@media (prefers-reduced-motion:reduce){.flowsvg .dash{animation:none}}
+.flowsvg .cb{fill:var(--surface-2);stroke:var(--metal);stroke-width:2}
+.flowsvg .ghost{fill:none;stroke:var(--metal);stroke-width:2;stroke-opacity:.6}
+.flowsvg .i-rub{fill:var(--rubber);stroke:var(--plastic-2);stroke-width:1.5}
+.flowsvg g.st{cursor:pointer}
+.flowsvg g.st text{font-family:var(--body);font-size:13px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.flowsvg g.st.sel text{fill:var(--accent)}
+.flowsvg g.st.sel .shape{filter:drop-shadow(0 0 3px var(--accent)) drop-shadow(0 0 1px var(--accent))}
+.flowdetail{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:16px;align-items:center}
+@media (max-width:600px){.flowdetail{grid-template-columns:minmax(0,1fr)}}
+.strokebar{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.strokebar div{font-family:var(--display);font-weight:600;text-align:center;padding:4px 2px;border-radius:3px;background:var(--surface-2);color:var(--muted);font-size:.95rem}
+.strokebar div.on{background:var(--accent);color:var(--accent-ink)}
+
+/* ---------- lights ---------- */
+.lights{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.light{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;border-top:4px solid var(--line)}
+.light.red{border-top-color:var(--red)} .light.amber{border-top-color:var(--amber)} .light.green{border-top-color:var(--green)}
+.light.sel{outline:2px solid var(--accent)}
+.light svg{width:44px;height:44px}
+.light.red svg{color:var(--red)} .light.amber svg{color:var(--amber)} .light.green svg{color:var(--green)}
+.light span{font-size:.9rem;font-weight:500;line-height:1.25}
+.bigicon svg{width:64px;height:64px}
+.bigicon.red{color:var(--red)} .bigicon.amber{color:var(--amber)} .bigicon.green{color:var(--green)}
+.sticky{position:sticky;top:calc(60px + env(safe-area-inset-top,0px))}
+@media (max-width:820px){.sticky{position:static}}
+/* maintenance */
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.scroll{overflow-x:auto}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+label.chk{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+label.chk:last-child{border-bottom:0}
+label.chk input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+label.chk small{display:block;color:var(--muted)}
+/* quiz */
+.opts{display:flex;flex-direction:column;gap:8px}
+.opts button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:10px 12px}
+.opts button.right{border-color:var(--green);background:var(--green-bg)}
+.opts button.wrong{border-color:var(--red);background:var(--red-bg)}
+.opts button:disabled{cursor:default;color:var(--ink)}
+.progress{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent)}
+footer{color:var(--muted);font-size:.85rem;padding:0 0 32px;max-width:75ch}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="plate"><h1>My 320d Under the Hood</h1><span class="sub">BMW 3 Series Saloon (G20), 2021, rear-wheel drive</span></div>
+  <div class="specs">
+    <span class="chip">Engine: B47, 2.0 l four-cylinder turbodiesel</span>
+    <span class="chip">About 190 PS / 400 Nm</span>
+    <span class="chip">48 V mild hybrid (type code 0005/CYN)</span>
+    <span class="chip">8-speed Steptronic automatic</span>
+    <span class="chip">Exhaust cleaning: DPF + AdBlue (SCR)</span>
+    <span class="chip">12 V battery in the boot</span>
+  </div>
+</div></header>
+<nav class="tabs" aria-label="Sections"><div class="wrap">
+  <a href="#whole-car">Whole car</a>
+  <a href="#engine-bay">Engine bay</a>
+  <a href="#how-it-works">How it works</a>
+  <a href="#warning-lights">Warning lights</a>
+  <a href="#maintenance">Maintenance</a>
+  <a href="#quiz">Quiz</a>
+</div></nav>
+<main><div class="wrap">
+
+<section class="view" id="v-whole-car">
+  <h2>Where everything sits in your car</h2>
+  <p class="lead">This is your saloon seen from the driver's side with the bodywork made see-through. The front is on the left. Tap a part or its name to see what it looks like up close and what it does.</p>
+  <div class="card stack">
+        <p class="swipe">Swipe the drawing sideways to see the whole car.</p>
+        <figure class="fig" id="carFig"></figure>
+        <div class="legend" aria-label="Colour key">
+          <span><i class="lg-en"></i>Engine</span>
+          <span><i class="lg-dr"></i>Drive to the wheels</span>
+          <span><i class="lg-ex"></i>Exhaust</span>
+          <span><i class="lg-co"></i>Cooling and AdBlue</span>
+          <span><i class="lg-el"></i>Electrical</span>
+          <span><i class="lg-fu"></i>Diesel</span>
+          <span><i class="lg-br"></i>Brakes</span>
+        </div>
+        <p class="small">Simplified drawing. Sizes and positions are approximate and differ slightly by build.</p>
+  </div>
+  <div class="grid2">
+    <div class="card" id="carDetail" aria-live="polite"></div>
+    <div class="partlist" id="carList"></div>
+  </div>
+</section>
+
+<section class="view" id="v-engine-bay">
+  <h2>Open the hood and look around</h2>
+  <p class="lead">Tap a part to learn what it is, how to recognise it on the real car, and what you may touch. You are standing at the front bumper looking in, so the windscreen is at the top of the drawing.</p>
+  <div class="note"><b>Opening the hood on a G20:</b> pull the release lever in the driver's footwell <b>twice</b>. The first pull unlatches, the second releases the safety catch. Lift the hood; gas struts hold it up. To close, lower it to about 50 cm and let it drop, then press on the front edge until it clicks on both sides.</div>
+  <div class="grid2">
+    <div class="stack">
+      <div class="card"><div id="bay"></div>
+        <p class="small" style="margin-top:8px">Simplified drawing, not to scale. Exact positions differ by build. Find each item by the symbol on its cap, as described in the panel.</p></div>
+      <div class="partlist" id="partlist"></div>
+      <p id="seenCount" class="small"></p>
+    </div>
+    <div class="card sticky" id="partDetail" aria-live="polite"></div>
+  </div>
+  <p class="lead">The battery, fuel tank, AdBlue tank, gearbox and exhaust are not under the hood. Find them on the <a href="#whole-car">Whole car</a> drawing.</p>
+</section>
+
+<section class="view" id="v-how-it-works">
+  <h2>How your diesel engine makes power</h2>
+  <p class="lead">A diesel has no spark plugs. It squeezes air so hard that it gets hot enough to ignite the fuel by itself. Each of your four cylinders repeats the four strokes below about 12 times a second at 1,500 rpm.</p>
+  <div class="grid2">
+    <div class="card stack">
+      <div id="cyl"></div>
+      <div class="strokebar" id="strokebar"><div>1 Intake</div><div>2 Compression</div><div>3 Power</div><div>4 Exhaust</div></div>
+      <div class="row">
+        <button class="btn primary" id="play">Play</button>
+        <button class="btn" id="step">Next stroke</button>
+        <label for="speed" class="small">Speed</label>
+        <input id="speed" type="range" min="1" max="6" value="2" style="flex:1;min-width:100px">
+      </div>
+    </div>
+    <div class="card stack" id="strokeText" aria-live="polite"></div>
+  </div>
+  <h3>Follow the air: from the grille to the tailpipe</h3>
+  <p class="lead">Tap each station. The tube colour shows what is inside: blue is cool air, yellow is hot compressed air, orange is exhaust, grey is cleaned exhaust. Most warning lights on a diesel trace back to one of these stations.</p>
+  <div class="card stack">
+    <p class="swipe">Swipe the drawing sideways to follow the tube.</p>
+    <figure class="fig" id="flow"></figure>
+    <div id="flowDetail" aria-live="polite"></div>
+  </div>
+  <h3>Follow the power: from the engine to the road</h3>
+  <p class="lead">Your car seen from above, front on the left. Only the rear wheels are driven.</p>
+  <div class="card stack">
+    <p class="swipe">Swipe the drawing sideways to see the rear axle.</p>
+    <figure class="fig" id="power"></figure>
+    <div id="powerDetail" aria-live="polite"></div>
+  </div>
+  <div class="card stack">
+    <h3>The supporting systems</h3>
+    <div class="scroll"><table>
+      <tr><th>System</th><th>Job</th><th>What you can check</th></tr>
+      <tr><td>Lubrication</td><td>An oil pump pushes oil between all moving metal parts so they never touch. Oil also cools the turbocharger.</td><td>Oil level on the screen, oil service on time.</td></tr>
+      <tr><td>Cooling</td><td>A water and antifreeze mix carries heat from the engine to the radiator. A thermostat keeps the engine near 90 to 100 °C.</td><td>Coolant level in the tank, engine cold.</td></tr>
+      <tr><td>Electrical</td><td>The 12 V battery runs electronics and lights. On the mild hybrid, a 48 V starter-generator restarts the engine, recovers braking energy and gives a short boost.</td><td>Slow or hesitant starting, battery messages.</td></tr>
+      <tr><td>Brakes</td><td>The pedal pressurises brake fluid, which clamps pads onto discs at each wheel. ABS and DSC modulate that pressure to keep the car steerable and stable.</td><td>Fluid level, pad wear shown in the service menu.</td></tr>
+      <tr><td>Exhaust cleaning</td><td>Oxidation catalyst, particulate filter and AdBlue-fed SCR catalyst remove carbon monoxide, soot and nitrogen oxides.</td><td>AdBlue range, regular longer drives.</td></tr>
+    </table></div>
+  </div>
+</section>
+
+<section class="view" id="v-warning-lights">
+  <h2>Warning lights and what they are connected to</h2>
+  <p class="lead">Colour tells you the urgency. <b>Red</b>: stop as soon as it is safe. <b>Yellow</b>: you can usually continue carefully, but act soon. <b>Green or blue</b>: information only. Your BMW also shows a text message (Check Control) with each light.</p>
+  <div class="row" id="lightFilter" role="group" aria-label="Filter by colour">
+    <button class="btn" data-f="all" aria-pressed="true">All</button>
+    <button class="btn" data-f="red" aria-pressed="false">Red</button>
+    <button class="btn" data-f="amber" aria-pressed="false">Yellow</button>
+    <button class="btn" data-f="green" aria-pressed="false">Info</button>
+  </div>
+  <div class="grid2">
+    <div class="lights" id="lights"></div>
+    <div class="card sticky" id="lightDetail" aria-live="polite"></div>
+  </div>
+  <div class="note warn">Symbols here are simplified drawings. The exact symbols for your car are in the owner's manual: in the car under <b>CAR &gt; Driver's Guide</b>, or in the BMW Driver's Guide app using your VIN.</div>
+</section>
+
+<section class="view" id="v-maintenance">
+  <h2>Maintenance for a five-year-old 320d</h2>
+  <p class="lead">BMW does not use fixed intervals. The car measures use and time and tells you what is due (Condition Based Service). See it under <b>CAR &gt; Vehicle status &gt; Service requirements</b>.</p>
+  <div class="card stack">
+    <h3>Likely due around year five</h3>
+    <p class="small">Tick what you have confirmed in your service history or the service menu. Ticks are saved in this browser only.</p>
+    <div id="due5"></div>
+  </div>
+  <div class="card stack">
+    <h3>Service items and typical timing</h3>
+    <div class="scroll"><table id="svcTable"></table></div>
+    <p class="small">Timings are typical values for this engine. What the car displays and what your service booklet says take priority.</p>
+  </div>
+  <div class="card stack">
+    <h3>Your five-minute monthly check</h3>
+    <div id="monthly"></div>
+    <div class="row"><button class="btn" id="resetMonthly">Clear monthly ticks</button></div>
+  </div>
+  <div class="card stack">
+    <h3>Habits that keep a modern diesel healthy</h3>
+    <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:70ch">
+      <li><b>Give it a long run.</b> Many short city trips fill the particulate filter with soot. A 20 to 30 minute drive on a motorway or country road every week or two lets it burn clean.</li>
+      <li><b>Do not switch off mid-clean.</b> If the cooling fan runs loudly after parking, idle is slightly higher, or you smell something hot, the filter was regenerating. No harm done, but try to finish the next one.</li>
+      <li><b>Warm up by driving gently,</b> not by idling. Keep revs moderate until the oil is warm.</li>
+      <li><b>Let the turbo settle.</b> After hard motorway driving, drive the last minute or two gently before switching off.</li>
+      <li><b>Refill AdBlue early.</b> When the range reaches zero the car will not restart.</li>
+      <li><b>Wrong fuel.</b> If petrol goes into the tank, do not start the engine. Call roadside assistance.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="view" id="v-quiz">
+  <h2>What would you do?</h2>
+  <p class="lead">Ten everyday situations. Pick an answer to see why it is right or wrong.</p>
+  <div class="card stack" id="quizBox"></div>
+</section>
+
+<footer>This is a learning aid for basic understanding. It does not replace the owner's manual or a workshop diagnosis. The engine bay gets hot and has moving parts: check things with the engine off and cool.</footer>
+</div></main>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s)};
+var store={get:function(k,d){try{var v=localStorage.getItem("m320d_"+k);return v?JSON.parse(v):d}catch(e){return d}},set:function(k,v){try{localStorage.setItem("m320d_"+k,JSON.stringify(v))}catch(e){}}};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+/* ---------- routing ---------- */
+var views=["whole-car","engine-bay","how-it-works","warning-lights","maintenance","quiz"];
+function route(){
+  var h=(location.hash||"").slice(1); if(views.indexOf(h)<0) h=views[0];
+  views.forEach(function(v){$("#v-"+v).classList.toggle("on",v===h)});
+  document.querySelectorAll("nav.tabs a").forEach(function(a){if(a.getAttribute("href")==="#"+h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  if(h!=="how-it-works") stop();
+}
+window.addEventListener("hashchange",function(){route();window.scrollTo(0,0)});
+
+/* ---------- dashboard symbols (also used on caps in the drawings) ---------- */
+var IC={
+ oil:'<path d="M8 26h20l8-8 6 2-10 12H12z M8 26v-5h8 M4 20l5 3 M41 26q3 5 0 7q-3-2 0-7"/>',
+ temp:'<path d="M24 6v20 M24 10h6 M24 15h6 M24 20h6"/><circle cx="24" cy="30" r="4"/><path d="M6 38q4-4 8 0t8 0 8 0 8 0 M6 44q4-4 8 0t8 0 8 0 8 0"/>',
+ batt:'<rect x="6" y="14" width="36" height="24" rx="2"/><path d="M12 14v-4h6v4 M30 14v-4h6v4 M12 24h7 M30 24h7 M33.5 20.5v7"/>',
+ brake:'<circle cx="24" cy="24" r="12"/><path d="M24 17v8 M24 29v2 M8 12q-6 12 0 24 M40 12q6 12 0 24"/>',
+ engine:'<path d="M10 20h6v-4h14v4h6l4 5v9h-6l-3 4H16l-4-4H8v-9z M19 12h10 M4 24v8"/>',
+ tyre:'<path d="M12 10q-8 14 0 26h24q8-12 0-26 M24 16v10 M24 30v2 M13 38v4 M19 38v4 M24 38v4 M29 38v4 M35 38v4"/>',
+ abs:'<circle cx="24" cy="24" r="13"/><text x="24" y="28" text-anchor="middle" font-size="10" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">ABS</text><path d="M7 12q-6 12 0 24 M41 12q6 12 0 24"/>',
+ dsc:'<path d="M14 18l3-7h14l3 7 M12 18h24v8H12z"/><circle cx="17" cy="27" r="2.5"/><circle cx="31" cy="27" r="2.5"/><path d="M14 33q4 3 0 6t0 6 M34 33q-4 3 0 6t0 6"/>',
+ steer:'<circle cx="18" cy="24" r="12"/><circle cx="18" cy="24" r="3"/><path d="M6 24h9 M21 24h9 M18 27v9 M40 14v14 M40 33v2"/>',
+ adblue:'<path d="M10 12h28l4 10v16H6V22z"/><text x="24" y="33" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">AdBlue</text>',
+ pads:'<circle cx="24" cy="24" r="10"/><path d="M8 12q-6 12 0 24 M40 12q6 12 0 24" stroke-dasharray="4 3"/>',
+ airbag:'<circle cx="16" cy="12" r="4"/><path d="M16 18v12l8 4 M16 30l-4 12"/><circle cx="32" cy="20" r="8"/>',
+ belt:'<circle cx="24" cy="10" r="5"/><path d="M14 42V26q0-8 10-8t10 8v16 M14 20l20 18"/>',
+ fuel:'<rect x="10" y="8" width="18" height="32" rx="2"/><path d="M14 14h10v8H14z M28 20h4q4 0 4 4v10q0 3 3 3t3-3V18l-5-5"/>',
+ gear:'<circle cx="24" cy="24" r="9"/><path d="M24 6v6 M24 36v6 M6 24h6 M36 24h6 M11 11l4 4 M33 33l4 4 M37 11l-4 4 M15 33l-4 4 M24 19v6 M24 28v1"/>',
+ coolant:'<path d="M10 16h28v22H10z M18 16v-5h12v5 M14 28q3-3 6 0t6 0 6 0 M24 20v-2"/>',
+ washer:'<path d="M6 34q18-22 36 0z M24 34v-8 M18 14q3-6 6 6 M30 14q-3-6-6 6"/>',
+ glow:'<path d="M4 26h6q3-10 6 0t6 0 6 0 6 0 4 0h6" />',
+ service:'<path d="M8 30l4-10h24l4 10v8H8z"/><circle cx="15" cy="34" r="2"/><circle cx="33" cy="34" r="2"/><path d="M20 8l8 8 M28 8l-8 8"/>',
+ frost:'<path d="M24 6v36 M8 15l32 18 M40 15L8 33 M20 9l4 4 4-4 M20 39l4-4 4 4"/>',
+ park:'<circle cx="24" cy="24" r="12"/><text x="24" y="29" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor" stroke="none" font-family="sans-serif">P</text><path d="M7 12q-6 12 0 24 M41 12q6 12 0 24"/>'
+};
+function icon(k){return '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[k]+'</svg>'}
+
+/* ---------- close-up drawings of the parts ---------- */
+function centre(fig,x){if(fig.scrollWidth>fig.clientWidth+4)fig.scrollLeft=Math.max(0,x/960*fig.scrollWidth-fig.clientWidth/2)}
+function fins(x0,x1,y0,y1,st){var d="";for(var x=x0;x<=x1;x+=st)d+="M"+x+" "+y0+"V"+y1;return d}
+function rows(x0,x1,y0,y1,st){var d="";for(var y=y0;y<=y1;y+=st)d+="M"+x0+" "+y+"H"+x1;return d}
+function zig(x0,x1,y0,y1,st){var d="M"+x0+" "+y1,up=true;for(var x=x0+st;x<=x1;x+=st){d+="L"+x+" "+(up?y0:y1);up=!up}return d}
+function tx(x,y,s,a){return '<text class="i-tx" x="'+x+'" y="'+y+'" text-anchor="'+(a||"middle")+'">'+s+'</text>'}
+var swirl=function(cx,cy){return '<path class="i-thin" d="M'+(cx-20)+' '+cy+'a20 20 0 0 1 40 0a14 14 0 0 1-28 0a8 8 0 0 1 16 0"/>'};
+var PIC={
+ engine:'<rect class="i-pl" x="60" y="12" width="120" height="126" rx="14"/><path class="i-thin" d="M78 34h84M78 48h84M78 104h84M78 118h84"/><circle class="i-st" cx="120" cy="76" r="16"/><circle class="i-thin" cx="120" cy="76" r="9"/><circle class="i-st" cx="92" cy="124" r="8"/>'+tx(206,128,"oil cap","middle")+'<path class="i-thin" d="M186 124H102"/>',
+ oilcap:'<circle class="i-pl" cx="120" cy="75" r="56"/><circle cx="120" cy="75" r="56" fill="none" stroke="var(--plastic-2)" stroke-width="9" stroke-dasharray="11 11"/><circle class="i-thin" cx="120" cy="75" r="40"/><g class="i-sym" transform="translate(91 44) scale(1.2)">'+IC.oil+'</g>',
+ coolant:'<rect class="i-pl" x="84" y="10" width="56" height="28" rx="6"/><path class="i-gl" d="M46 50q0-12 12-12h124q12 0 12 12v72q0 14-14 14H60q-14 0-14-14z"/><path class="i-cool i-liq" d="M48 84h144v38q0 12-12 12H60q-12 0-12-12z"/><path class="i-ln" d="M154 66h24M154 106h24"/>'+tx(148,70,"MAX","end")+tx(148,110,"MIN","end")+'<g class="i-symw" transform="translate(100 12) scale(.5)">'+IC.temp+'</g>',
+ washer:'<rect class="i-pl" x="98" y="84" width="44" height="58" rx="6"/><rect class="i-cool" x="72" y="26" width="96" height="62" rx="12"/><g class="i-symw" transform="translate(93 28) scale(1.1)">'+IC.washer+'</g>',
+ brakefluid:'<rect class="i-el" x="90" y="16" width="60" height="34" rx="7"/><path class="i-gl" d="M46 50h148v70q0 14-14 14H60q-14 0-14-14z"/><path class="i-el i-liq" d="M48 82h144v38q0 12-12 12H60q-12 0-12-12z"/><path class="i-ln" d="M154 66h24M154 106h24"/>'+tx(148,70,"MAX","end")+tx(148,110,"MIN","end")+'<g class="i-symw" transform="translate(104 17) scale(.66)">'+IC.brake+'</g>',
+ jump:'<rect class="i-red" x="26" y="30" width="96" height="76" rx="9"/><path d="M74 46v44M52 68h44" fill="none" stroke="var(--accent-ink)" stroke-width="7" stroke-linecap="round"/><circle class="i-st" cx="180" cy="68" r="24"/><circle class="i-st" cx="180" cy="68" r="11"/><path class="i-ln" d="M172 68h16"/>'+tx(74,128,"plus, under a red flap")+tx(180,128,"earth point"),
+ airbox:'<path class="i-duct" d="M176 80h18q22 0 22 22v40"/><rect class="i-pl" x="24" y="30" width="156" height="92" rx="12"/><path class="i-thin" d="'+rows(40,164,48,104,14)+'"/>'+tx(102,140,"flat black box, wide duct"),
+ turbo:'<rect class="i-st" x="108" y="62" width="34" height="30"/><path class="i-st" d="M70 30h62v22H92z"/><circle class="i-st" cx="78" cy="78" r="44"/>'+swirl(78,78)+'<circle class="i-pl" cx="78" cy="78" r="7"/><path class="i-hot" d="M168 118h46v-22h-30z"/><circle class="i-hot" cx="166" cy="78" r="38"/><circle class="i-pl" cx="166" cy="78" r="12"/>'+tx(74,142,"cold side: air")+tx(170,142,"hot side: exhaust"),
+ radiator:'<rect class="i-pl" x="18" y="22" width="12" height="104" rx="3"/><rect class="i-pl" x="210" y="22" width="12" height="104" rx="3"/><rect class="i-cool" x="30" y="22" width="180" height="104"/><path class="i-fin" d="'+fins(38,204,24,124,7)+'"/><circle class="i-pl" cx="120" cy="74" r="40" fill-opacity=".85"/><path class="i-thin" d="M120 74l0-34M120 74l30 17M120 74l-30 17M120 74l22-26M120 74l12 32M120 74l-33-8"/><circle class="i-st" cx="120" cy="74" r="8"/>',
+ belt:'<path class="i-cable" d="M206 40q22 0 22-26"/><rect class="i-el" x="134" y="18" width="76" height="52" rx="12"/>'+'<text class="i-txw" x="180" y="48" text-anchor="middle">48 V</text>'+'<path class="i-belt" d="M38 78L128 28L210 92L190 124L54 126Z"/><circle class="i-st" cx="58" cy="98" r="28"/><circle class="i-pl" cx="58" cy="98" r="8"/><circle class="i-st" cx="140" cy="44" r="18"/><circle class="i-pl" cx="140" cy="44" r="5"/><circle class="i-st" cx="192" cy="106" r="20"/><circle class="i-pl" cx="192" cy="106" r="6"/>'+tx(58,142,"crankshaft")+tx(192,142,"A/C"),
+ cabin:'<rect class="i-pl" x="18" y="14" width="204" height="32" rx="7"/><path class="i-thin" d="'+rows(30,210,24,36,6)+'"/><rect class="i-st" x="32" y="64" width="176" height="62" rx="4"/><path class="i-ln" d="'+zig(38,202,72,118,8)+'"/>'+tx(120,142,"pleated filter under the cowl trim"),
+ strut:'<path d="M34 112L140 52" fill="none" stroke="var(--plastic-2)" stroke-width="13" stroke-linecap="round"/><path d="M140 52L196 20" fill="none" stroke="var(--steel-2)" stroke-width="5" stroke-linecap="round"/><circle class="i-st" cx="30" cy="114" r="7"/><circle class="i-st" cx="200" cy="18" r="7"/><rect class="i-st" x="164" y="96" width="44" height="32" rx="4"/><path class="i-ln" d="M186 96V80q0-9-9-9"/>'+tx(78,140,"gas strut")+tx(186,144,"latch"),
+ gearbox:'<path class="i-dr" d="M26 26L70 36V114L26 124Z"/><path class="i-dr" d="M70 44L172 58L206 68V98L172 104L70 110Z"/><rect class="i-st" x="88" y="108" width="80" height="14" rx="3"/><rect class="i-st" x="206" y="72" width="12" height="22" rx="2"/><path class="i-thin" d="M100 52V106M130 56V106M160 60V104"/>'+tx(48,142,"converter")+tx(128,142,"8 gears")+tx(210,142,"to shaft"),
+ propshaft:'<rect class="i-dr" x="40" y="64" width="160" height="20" rx="4"/><rect class="i-pl" x="110" y="52" width="20" height="44" rx="5"/><circle class="i-st" cx="34" cy="74" r="18"/><path class="i-thin" d="M22 74h24M34 62v24"/><circle class="i-st" cx="206" cy="74" r="18"/><path class="i-thin" d="M194 74h24M206 62v24"/>'+tx(34,116,"from gearbox")+tx(120,116,"bearing")+tx(204,116,"to rear axle"),
+ diff:'<rect class="i-st" x="8" y="74" width="72" height="14" rx="5"/><rect class="i-st" x="160" y="74" width="72" height="14" rx="5"/><rect class="i-dr" x="104" y="16" width="32" height="30" rx="4"/><ellipse class="i-dr" cx="120" cy="82" rx="46" ry="40"/><circle class="i-thin" cx="120" cy="82" r="22"/>'+tx(160,30,"from propshaft","start")+tx(40,112,"left wheel")+tx(200,112,"right wheel"),
+ dpf:'<rect class="i-st" x="8" y="66" width="34" height="24"/><rect class="i-st" x="198" y="66" width="34" height="24"/><path class="i-ln" d="M66 44V24M178 44V24"/><rect class="i-hot" x="34" y="42" width="172" height="72" rx="32"/><rect class="i-pl" x="80" y="52" width="80" height="52" rx="4"/><path class="i-grid" d="'+fins(88,152,54,102,8)+rows(82,158,60,96,9)+'"/>'+tx(122,18,"pressure sensors")+tx(120,136,"honeycomb that traps soot"),
+ scr:'<rect class="i-st" x="8" y="74" width="66" height="26"/><rect class="i-cool" x="32" y="30" width="16" height="34" rx="3"/><path class="i-spray" d="M40 66l-9 14M40 66v18M40 66l9 14"/><rect class="i-hot" x="72" y="54" width="156" height="66" rx="28"/><path class="i-grid" d="'+fins(104,198,62,112,10)+'"/>'+tx(56,28,"AdBlue injector","start")+tx(150,140,"catalyst"),
+ tank:'<rect class="i-pl" x="52" y="18" width="34" height="16" rx="3"/><path class="i-fu" d="M22 44q0-12 12-12h172q12 0 12 12v58q0 12-12 12h-54q-10 0-12-10l-8-32h-24l-8 32q-2 10-12 10H34q-12 0-12-12z"/>'+tx(120,136,"propshaft passes under the middle")+tx(92,27,"pump","start"),
+ filler:'<rect class="i-pl" x="34" y="14" width="172" height="122" rx="18"/><circle class="i-fu" cx="96" cy="72" r="40"/><circle class="i-pl" cx="96" cy="72" r="30"/><text class="i-txw" x="96" y="76" text-anchor="middle">Diesel</text><circle class="i-cool" cx="170" cy="98" r="24"/><text class="i-txw" x="170" y="102" text-anchor="middle">AdBlue</text>',
+ adblue:'<path class="i-gl" d="M40 40q0-12 12-12h136q12 0 12 12v72q0 12-12 12H52q-12 0-12-12z"/><path class="i-cool i-liq" d="M42 74h156v38q0 10-10 10H52q-10 0-10-10z"/><rect class="i-pl" x="150" y="16" width="34" height="22" rx="4"/><path class="i-spray" d="M168 16V6h50"/>'+tx(120,104,"AdBlue")+tx(120,142,"pump and heater on top, line to the exhaust"),
+ batt12:'<rect class="i-red" x="58" y="24" width="26" height="20" rx="3"/><rect class="i-st" x="156" y="24" width="26" height="20" rx="3"/><rect class="i-pl" x="36" y="42" width="168" height="90" rx="7"/><rect class="i-st" x="36" y="42" width="168" height="16" rx="5"/><path class="i-ln" d="M64 14h14M71 7v14M162 14h14"/><text class="i-txw" x="120" y="98" text-anchor="middle">12 V AGM</text>',
+ batt48:'<path class="i-cable" d="M196 38q0-20 26-20"/><rect class="i-hot" x="180" y="34" width="32" height="24" rx="4"/><rect class="i-el" x="26" y="52" width="188" height="70" rx="9"/><path class="i-thin" d="M44 70h150M44 104h150"/><text class="i-txw" x="120" y="92" text-anchor="middle">48 V lithium-ion</text>',
+ fuse:(function(){var s='<rect class="i-pl" x="34" y="18" width="172" height="114" rx="9"/>',c=["i-red","i-el","i-cool","i-fu"],k=0;for(var y=30;y<=102;y+=24)for(var x=46;x<=180;x+=22){s+='<rect class="'+c[(k++*3+y)%4]+'" x="'+x+'" y="'+y+'" width="14" height="18" rx="2"/>'}return s})(),
+ brake:'<circle class="i-st" cx="108" cy="75" r="62"/><circle class="i-thin" cx="108" cy="75" r="50"/><circle class="i-pl" cx="108" cy="75" r="24"/><circle class="i-st" cx="108" cy="75" r="8"/><path d="M150 26A64 64 0 0 1 170 104" fill="none" stroke="var(--red)" stroke-width="26" stroke-linecap="round"/>'+tx(206,62,"caliper")+tx(206,76,"with pads"),
+ silencer:'<rect class="i-st" x="8" y="62" width="34" height="18"/><rect class="i-st" x="182" y="46" width="50" height="18" rx="9"/><rect class="i-st" x="182" y="88" width="50" height="18" rx="9"/><ellipse class="i-pl" cx="226" cy="55" rx="4" ry="7"/><ellipse class="i-pl" cx="226" cy="97" rx="4" ry="7"/><rect class="i-hot" x="34" y="34" width="156" height="84" rx="34"/>'+tx(112,80,"silencer")+tx(120,140,"two tailpipes at the rear bumper")
+};
+function pic(k,label){return '<figure class="picbox"><svg viewBox="0 0 240 150" role="img" aria-label="Drawing of the '+esc(label)+'">'+PIC[k]+'</svg><figcaption>What it looks like</figcaption></figure>'}
+
+/* ---------- whole car ---------- */
+var carParts=[
+ {id:"rad",name:"Radiator pack",pic:"radiator",a:[72,222],l:[80,-38],
+  shape:'<rect class="i-cool" x="62" y="222" width="5" height="66" rx="2"/><rect class="i-cool" x="69" y="222" width="6" height="66" rx="2"/><rect class="i-cool" x="77" y="222" width="7" height="66" rx="2"/><rect class="i-pl" x="86" y="226" width="8" height="58" rx="3"/><rect class="hit" x="56" y="216" width="44" height="78"/>',
+  where:"Right behind the front grille, at the very nose of the car.",
+  what:"Three heat exchangers stacked one behind the other. The radiator cools the engine coolant, the charge-air cooler cools the air coming from the turbo, and the condenser belongs to the air conditioning. An electric fan pulls air through them.",
+  know:"Keep the grille free of leaves and plastic bags. The fan can start by itself, even after the engine is off."},
+ {id:"engine",name:"Engine",pic:"engine",a:[200,200],l:[190,-38],
+  shape:'<path class="i-st" d="M158 272h104l-6 20h-86z"/><rect class="i-st" x="150" y="226" width="120" height="48" rx="4"/><rect class="i-st" x="154" y="206" width="112" height="22" rx="4"/><rect class="i-pl" x="150" y="197" width="118" height="11" rx="5"/><path class="i-thin" d="M176 234v32M202 234v32M228 234v32"/>',
+  where:"Lengthways under the hood, sitting mostly behind the front axle. That placement is what gives the 3 Series its even weight balance.",
+  what:"A 2.0 litre four-cylinder turbodiesel (BMW code B47) with about 190 PS and 400 Nm. It burns diesel in four cylinders and turns the crankshaft, which everything else is driven from.",
+  know:"The things you check yourself are all on top of it or around it. See the <a href=\"#engine-bay\">Engine bay</a> drawing."},
+ {id:"turbo",name:"Turbocharger",pic:"turbo",a:[226,211],l:[258,-12],
+  shape:'<circle class="i-hot" cx="226" cy="224" r="12"/><circle class="i-pl" cx="226" cy="224" r="4"/>',
+  where:"On the exhaust side of the engine, low down under silver heat shields.",
+  what:"Exhaust gas spins a small turbine at up to around 200,000 rpm. On the same shaft a compressor wheel forces more air into the engine. More air means more fuel can burn, which is where the pulling power comes from.",
+  know:"It gets extremely hot and lives on clean oil. On-time oil changes are its life insurance."},
+ {id:"b48",name:"48 V battery",pic:"batt48",a:[279,184],l:[340,-38],
+  shape:'<rect class="i-el" x="262" y="184" width="34" height="18" rx="3"/>',
+  where:"In the engine bay under a plastic cover. The exact spot differs by build; your owner's manual shows it.",
+  what:"A small lithium-ion battery. It stores the energy recovered when you slow down and feeds the starter-generator for restarts and a short boost.",
+  know:"Maintenance-free. Leave its cover and cables alone. A fault shows as a 48 V or drivetrain message."},
+ {id:"fuse",name:"Fuse boxes",pic:"fuse",a:[349,202],l:[462,-38],
+  shape:'<rect class="i-el" x="338" y="202" width="22" height="14" rx="2"/><rect class="i-el" x="826" y="206" width="18" height="12" rx="2"/>',
+  where:"One behind the glovebox area, one in the boot on the right.",
+  what:"Each electrical circuit has a fuse that melts before a cable can overheat.",
+  know:"A fuse card in the boot shows which fuse protects what. Replace a fuse only with one of the same rating."},
+ {id:"filler",name:"Fuel and AdBlue fillers",pic:"filler",a:[770,177],l:[690,-38],
+  shape:'<circle cx="770" cy="186" r="10" fill="var(--surface)" stroke="var(--metal)" stroke-width="1.5" stroke-dasharray="3 2"/><circle class="i-fu" cx="767" cy="185" r="4"/><circle class="i-cool" cx="775" cy="189" r="2.5"/>',
+  where:"Behind the fuel flap on the right rear wing. That is the far side in this drawing.",
+  what:"Two fillers side by side: the large one for diesel, the small blue one for AdBlue.",
+  know:"AdBlue is a urea solution that cleans the exhaust. It is not a fuel additive. Never pour it into the diesel filler, and never put anything but AdBlue under the blue cap."},
+ {id:"adb",name:"AdBlue tank",pic:"adblue",a:[820,240],l:[810,-12],
+  shape:'<rect class="i-cool" x="800" y="240" width="40" height="30" rx="6"/>',
+  where:"Under the rear of the car, near the boot floor. The exact position differs by build.",
+  what:"Holds the AdBlue. A small pump sends it forward to an injector in the exhaust. The tank is heated because AdBlue freezes at about minus 11 °C.",
+  know:"The display counts down the remaining range. At zero the engine will not restart, so refill early."},
+ {id:"b12",name:"12 V battery",pic:"batt12",a:[875,214],l:[896,-38],
+  shape:'<rect class="i-el" x="852" y="218" width="46" height="28" rx="3"/><rect class="i-red" x="858" y="213" width="8" height="6" rx="1"/><rect class="i-st" x="884" y="213" width="8" height="6" rx="1"/>',
+  where:"In the boot, under the floor on the right.",
+  what:"Runs the electronics and lights. BMW puts it in the back for weight balance.",
+  know:"You never need to reach it for a jump start: use the terminals under the hood (engine bay part 6). Batteries last about 5 to 8 years, and a new one must be registered to the car by the workshop."},
+ {id:"sg",name:"Starter-generator",pic:"belt",a:[146,246],l:[90,372],
+  shape:'<path class="i-belt" d="M138 232L141 268L160 266L154 230Z"/><circle class="i-st" cx="150" cy="264" r="10"/><circle class="i-el" cx="146" cy="236" r="9"/>',
+  where:"At the front of the engine, driven by the ribbed belt.",
+  what:"The heart of the 48 V mild hybrid. It restarts the engine smoothly at traffic lights, charges the batteries when you slow down and adds a small boost when you accelerate.",
+  know:"Never touch the belt area with the engine running or the ignition on. A squeal at start-up means the belt needs a look."},
+ {id:"dpf",name:"Particulate filter",pic:"dpf",a:[251,286],l:[282,396],
+  shape:'<path class="pipe" d="M232 232q8 4 12 10"/><rect class="i-hot" x="236" y="238" width="30" height="50" rx="12"/>',
+  where:"Bolted to the engine right behind the turbo, so it heats up quickly.",
+  what:"An oxidation catalyst and a ceramic honeycomb in one housing. The catalyst burns off carbon monoxide and unburnt fuel; the honeycomb traps soot. Every few hundred kilometres the car heats it above about 600 °C to burn the soot to ash.",
+  know:"That cleaning needs steady driving. Give the car a 20 to 30 minute run on a motorway or country road every week or two."},
+ {id:"gearbox",name:"Gearbox",pic:"gearbox",a:[360,290],l:[380,372],
+  shape:'<path class="i-dr" d="M272 232L300 236V290L272 292Z"/><path class="i-dr" d="M300 242L400 252L418 262V282L300 290Z"/>',
+  where:"Directly behind the engine, inside the centre tunnel between the front footwells.",
+  what:"An 8-speed automatic. Its wide front end holds the torque converter, a fluid coupling that lets the car stand still in Drive. Behind it sit the gear sets that keep the engine in its efficient range.",
+  know:"Nothing to check yourself. BMW calls the oil a lifetime fill; many specialists suggest changing it around 80,000 to 120,000 km."},
+ {id:"scr",name:"SCR catalyst",pic:"scr",a:[480,305],l:[468,396],
+  shape:'<path class="pipe" d="M251 286V297H440"/><rect class="i-hot" x="440" y="288" width="80" height="17" rx="8"/><rect class="i-cool" x="424" y="282" width="6" height="12" rx="2"/>',
+  where:"In the exhaust line under the floor. On some builds part of it is combined with the particulate filter at the engine.",
+  what:"AdBlue is sprayed into the exhaust just ahead of it and turns into ammonia. In the catalyst the ammonia converts harmful nitrogen oxides into nitrogen and water.",
+  know:"You cannot service it. Keeping AdBlue topped up is your whole job here."},
+ {id:"prop",name:"Propshaft",pic:"propshaft",a:[540,277],l:[548,372],
+  shape:'<rect class="i-dr" x="418" y="269" width="288" height="7" rx="3"/><rect class="hit" x="418" y="260" width="150" height="26"/>',
+  where:"Under the centre tunnel, running from the gearbox to the rear axle.",
+  what:"A long shaft that carries the rotation to the back of the car.",
+  know:"Nothing to check. A new vibration or hum that changes with speed is worth mentioning at the workshop."},
+ {id:"tank",name:"Diesel tank",pic:"tank",a:[618,292],l:[612,396],
+  shape:'<rect class="i-fu" x="572" y="252" width="92" height="40" rx="10" fill-opacity=".9"/><rect class="i-dr" x="572" y="269" width="92" height="7" opacity=".45"/>',
+  where:"Under the rear seat, ahead of the rear axle. It is shaped like a saddle so the propshaft can pass underneath.",
+  what:"Holds close to 60 litres of diesel. A pump inside sends fuel forward to the engine.",
+  know:"Do not run it dry: the injection system can draw air and may need bleeding. If petrol goes in by mistake, do not start the engine."},
+ {id:"diff",name:"Rear differential",pic:"diff",a:[722,286],l:[704,372],
+  shape:'<rect class="i-dr" x="700" y="262" width="14" height="13" rx="2"/><circle class="i-dr" cx="728" cy="268" r="20"/>',
+  where:"In the middle of the rear axle, between the rear wheels.",
+  what:"Turns the drive through 90 degrees and lets the two rear wheels rotate at different speeds in a corner.",
+  know:"Your car is rear-wheel drive: the back wheels push, the front wheels only steer. Look for oil spots on the ground where you park."},
+ {id:"brakes",name:"Brakes",pic:"brake",a:[752,294],l:[806,372],
+  shape:'<circle cx="728" cy="267" r="31" fill="none" stroke="var(--steel)" stroke-width="11"/><circle class="i-thin" cx="728" cy="267" r="36.5"/><circle class="i-thin" cx="728" cy="267" r="25.5"/><path class="i-cal" d="M742 238A32 32 0 0 1 759 258"/>',
+  where:"A disc and a caliper behind every wheel. The drawing shows one at the rear; the front ones are larger.",
+  what:"The pedal pressurises brake fluid, which squeezes the pads in the caliper onto the spinning disc. The electric parking brake works on the rear wheels.",
+  know:"Pad wear is measured by sensors and shown in the service menu. The fluid is changed every two years."},
+ {id:"exh",name:"Silencer and tailpipes",pic:"silencer",a:[861,305],l:[868,396],
+  shape:'<path class="pipe" d="M520 297H826"/><rect class="i-hot" x="826" y="283" width="70" height="22" rx="10"/><path d="M896 296h24" fill="none" stroke="var(--steel-2)" stroke-width="7" stroke-linecap="round"/>',
+  where:"Across the back of the car under the boot, ending in the tailpipes at the rear bumper.",
+  what:"Quietens the exhaust. What leaves is mainly nitrogen, carbon dioxide and water vapour.",
+  know:"White steam on a cold morning is normal. Constant blue or black smoke is not."}
+];
+var CAR_BASE='<ellipse class="shadow" cx="480" cy="332" rx="440" ry="7"/>'+
+ '<path class="cb" d="M40 300C30 290 30 262 34 238C36 220 44 210 60 204C130 188 220 178 292 170C330 130 365 92 402 76C460 56 590 54 650 72C700 96 750 128 792 150L900 156C918 158 926 172 927 200L925 280C925 294 915 302 900 302L791 302A72 72 0 1 0 665 302L249 302A72 72 0 1 0 123 302Z"/>'+
+ '<path class="glass" d="M318 166L408 90C470 74 590 72 644 86L744 152Z"/><path class="pillar" d="M538 76V160"/>'+
+ '<path class="ghost" d="M440 252h74M498 244L516 150a8 8 0 0 1 16 3L518 244M606 246h70M662 240L688 152a8 8 0 0 1 15 4L680 240"/>'+
+ '<ellipse class="ghost" cx="414" cy="182" rx="5" ry="20" transform="rotate(-28 414 182)"/>'+
+ '<path class="lamp" d="M44 216q14-9 40-11l-6 12q-20 2-32 9z"/><path class="lamp rear" d="M902 160q18 2 22 22l-20-2z"/>'+
+ '<circle class="tyre" cx="186" cy="267" r="53"/><circle class="rim" cx="186" cy="267" r="62"/><circle class="rim" cx="186" cy="267" r="44"/>'+
+ '<circle class="tyre" cx="728" cy="267" r="53"/><circle class="rim" cx="728" cy="267" r="62"/><circle class="rim" cx="728" cy="267" r="44"/>';
+var curCar=null;
+function drawCar(){
+  var order=["rad","engine","sg","turbo","dpf","gearbox","tank","prop","scr","exh","brakes","diff","adb","b12","b48","fuse","filler"];
+  var byId={};carParts.forEach(function(p){byId[p.id]=p});
+  var s='<svg class="car" viewBox="0 -56 960 466" role="img" aria-label="Side view of the car with the main parts drawn where they sit">'+CAR_BASE;
+  order.forEach(function(id){var p=byId[id];s+='<g class="p" data-id="'+id+'" tabindex="0" role="button" aria-label="'+esc(p.name)+'">'+p.shape+'</g>'});
+  carParts.forEach(function(p){var top=p.l[1]<100,w=p.name.length*7.8+14;
+    s+='<g class="lbl" data-id="'+p.id+'" aria-hidden="true"><line x1="'+p.l[0]+'" y1="'+(p.l[1]+(top?6:-15))+'" x2="'+p.a[0]+'" y2="'+p.a[1]+'"/><circle cx="'+p.a[0]+'" cy="'+p.a[1]+'" r="2.5"/>'+
+      '<rect class="hit" x="'+(p.l[0]-w/2)+'" y="'+(p.l[1]-16)+'" width="'+w+'" height="24"/><text x="'+p.l[0]+'" y="'+p.l[1]+'">'+esc(p.name)+'</text></g>'});
+  s+='</svg>';
+  $("#carFig").innerHTML=s;
+  $("#carList").innerHTML=carParts.map(function(p){return '<button data-id="'+p.id+'">'+esc(p.name)+'</button>'}).join("");
+  function pick(e){var g=e.target.closest("[data-id]");if(g)showCar(g.getAttribute("data-id"))}
+  $("#carFig").addEventListener("click",pick);
+  $("#carList").addEventListener("click",function(e){pick(e);if(e.target.closest("[data-id]"))$("#carFig").scrollIntoView({block:"nearest",behavior:"smooth"})});
+  $("#carFig").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();pick(e)}});
+  showCar(null);
+}
+function showCar(id){
+  curCar=id;
+  var p=null;carParts.forEach(function(x){if(x.id===id)p=x});
+  $("#carFig svg").classList.toggle("focus",!!p);
+  document.querySelectorAll("#carFig [data-id],#carList button").forEach(function(el){el.classList.toggle("sel",el.getAttribute("data-id")===id)});
+  if(!p){
+    $("#carDetail").innerHTML='<div class="stack"><h3>Pick a part</h3><p>Tap any coloured part in the drawing, or a name in the list, to see a close-up and learn where it sits, what it does and what you need to know about it.</p>'+
+      '<p class="small">A good first tour: Engine, Turbocharger, Particulate filter, SCR catalyst, then Gearbox, Propshaft and Rear differential. That is the path of the exhaust, then the path of the power.</p></div>';
+    return;
+  }
+  $("#carDetail").innerHTML='<div class="stack"><h3>'+esc(p.name)+'</h3>'+pic(p.pic,p.name)+'<dl class="sheet">'+
+    '<div><dt>Where it sits</dt><dd>'+p.where+'</dd></div>'+
+    '<div><dt>What it does</dt><dd>'+p.what+'</dd></div>'+
+    '<div><dt>What you need to know</dt><dd>'+p.know+'</dd></div></dl>'+
+    '<div class="row"><button class="btn" id="carAll">Show all parts</button></div></div>';
+  $("#carAll").onclick=function(){showCar(null)};
+  centre($("#carFig"),p.a[0]);
+}
+
+/* ---------- engine bay ---------- */
+var parts=[
+ {n:1,name:"Engine and its cover",pic:"engine",at:[300,180],
+  shape:'<rect class="i-pl" x="236" y="128" width="128" height="188" rx="14"/><path class="i-thin" d="M254 148h92M254 162h92M254 262h92M254 276h92"/><circle class="i-st" cx="300" cy="222" r="15"/><circle class="i-thin" cx="300" cy="222" r="8"/>',
+  what:"The big plastic cover hides the engine itself: a 2.0 litre four-cylinder diesel (BMW code B47). Under it sit the injectors, the fuel rail and the valve gear. The cover is there for noise and looks.",
+  spot:"The large black panel in the middle with the BMW badge.",
+  you:"Nothing to do here. Do not remove the cover. Look around its edges now and then for wet oil or coolant traces.",
+  links:"Engine warning light, drivetrain malfunction message."},
+ {n:2,name:"Oil filler cap",pic:"oilcap",at:[300,296],
+  shape:'<circle class="i-st" cx="268" cy="296" r="13"/><circle class="i-pl" cx="268" cy="296" r="8"/>',
+  what:"Where engine oil is topped up. Your car has <b>no dipstick</b>. A sensor measures the level and shows it on the screen under CAR &gt; Vehicle status &gt; Engine oil level.",
+  spot:"A round black screw cap on top of the engine with an oil-can symbol.",
+  you:"Top up only when the car asks, usually 1 litre at a time, with oil that carries the BMW Longlife approval named in your manual. Engine off. Never overfill.",
+  links:"Yellow oil level message, red oil pressure light."},
+ {n:3,name:"Coolant expansion tank",pic:"coolant",at:[150,294],
+  shape:'<path class="i-gl" d="M96 258q0-10 10-10h52q10 0 10 10v40q0 12-12 12h-48q-12 0-12-12z"/><path class="i-cool i-liq" d="M98 286h68v12q0 10-10 10h-48q-10 0-10-10z"/><circle class="i-pl" cx="120" cy="268" r="11"/>',
+  what:"Reservoir for the engine coolant (water mixed with antifreeze). It gives the liquid room to expand as it heats up. Some builds have a second, smaller tank for a separate low-temperature circuit; treat both the same way.",
+  spot:"A black or translucent tank with a round cap showing a thermometer or steam warning symbol. The level indicator is under the cap or on the side with MIN and MAX.",
+  you:"Check the level only with the engine <b>cold</b>. Never open the cap when hot: the system is under pressure and can scald you. If it is low once, top up with BMW-approved coolant mix. If it drops again, there is a leak: go to a workshop.",
+  links:"Red coolant temperature light, coolant level message."},
+ {n:4,name:"Washer fluid filler",pic:"washer",at:[500,300],
+  shape:'<circle class="i-cool" cx="468" cy="300" r="15"/><circle cx="468" cy="300" r="8" fill="none" stroke="var(--accent-ink)" stroke-width="1.5"/>',
+  what:"Tank for the windscreen washer fluid. The tank is hidden; you only see the filler neck.",
+  spot:"A blue flip cap with a windscreen-and-spray symbol.",
+  you:"The one thing here you will refill regularly. Use ready-mixed washer fluid, with antifreeze in winter. Fill until you see fluid in the neck.",
+  links:"Washer fluid low message."},
+ {n:5,name:"Brake fluid reservoir",pic:"brakefluid",at:[408,114],
+  shape:'<rect class="i-gl" x="424" y="96" width="56" height="36" rx="8"/><circle class="i-el" cx="452" cy="114" r="11"/>',
+  what:"Holds the hydraulic fluid that carries your pedal force to the brakes. The level sinks slowly as pads wear. That is normal.",
+  spot:"Near the windscreen on the driver's side, usually under a plastic cover. A small tank with a yellow or black cap showing a circle-in-brackets symbol.",
+  you:"Look, do not touch. Level should sit between MIN and MAX. Brake fluid absorbs water and is replaced by a workshop every two years. It damages paint and skin.",
+  links:"Red brake warning light, brake pad wear light."},
+ {n:6,name:"Jump-start terminals",pic:"jump",at:[126,142],
+  shape:'<rect class="i-red" x="108" y="98" width="36" height="26" rx="5"/><path d="M126 104v14M119 111h14" fill="none" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><circle class="i-st" cx="160" cy="128" r="6"/>',
+  what:"Because the battery lives in the boot, BMW gives you connection points under the hood for jump-starting or charging.",
+  spot:"Positive: a red plastic flap marked with a plus sign. Negative: a bare metal post or nut on the body marked with a minus sign.",
+  you:"Order for jump leads: red to the dead car's plus, red to the donor's plus, black to the donor's minus, black to your earth point. Remove in reverse. On a mild hybrid, follow the manual exactly or call roadside assistance.",
+  links:"Red battery light, low battery messages."},
+ {n:7,name:"Air filter box and intake",pic:"airbox",at:[445,222],
+  shape:'<path class="i-duct" d="M445 258C445 300 424 312 412 344" style="stroke-width:12"/><rect class="i-pl" x="404" y="186" width="82" height="72" rx="10"/><path class="i-thin" d="M414 200h62M414 244h62"/>',
+  what:"All the air the engine burns enters here and passes through a paper filter that keeps dust out. An air-mass sensor right after it tells the engine computer how much air is coming in.",
+  spot:"A large flat black plastic box with a wide duct coming from the front grille.",
+  you:"Nothing routine. The filter is changed by the workshop. Just keep leaves and rags away from the intake duct.",
+  links:"Engine warning light (air-mass sensor), loss of power."},
+ {n:8,name:"Turbocharger",pic:"turbo",at:[178,184],
+  shape:'<rect class="i-st" x="203" y="176" width="10" height="16"/><circle class="i-hot" cx="208" cy="166" r="16"/><circle class="i-pl" cx="208" cy="166" r="5"/><circle class="i-st" cx="208" cy="202" r="13"/><circle class="i-pl" cx="208" cy="202" r="4"/>',
+  what:"Exhaust gas spins a small turbine at up to around 200,000 rpm. On the same shaft a compressor wheel forces more air into the engine. More air means more fuel can burn, which is where the pulling power comes from.",
+  spot:"Mostly hidden low on the exhaust side of the engine under heat shields. You will see thick metal pipes and silver shielding.",
+  you:"Never touch: it gets extremely hot. It lives on clean oil, so on-time oil changes are its life insurance.",
+  links:"Drivetrain malfunction, whistling or siren noise, blue smoke, loss of power."},
+ {n:9,name:"Radiator, intercooler and A/C condenser",pic:"radiator",at:[300,362],
+  shape:'<rect class="i-cool" x="150" y="350" width="300" height="24" rx="5"/><path class="i-fin" d="'+fins(158,444,352,372,7)+'"/>',
+  what:"A stack of heat exchangers right behind the grille. The radiator cools engine coolant, the charge-air cooler cools the air from the turbo, and the condenser belongs to the air conditioning. An electric fan pulls air through.",
+  spot:"Look down behind the front panel: thin aluminium fins in flat layers.",
+  you:"Keep the grille free of leaves and plastic bags. The fan can start by itself, even after the engine is off, so keep hands clear.",
+  links:"Coolant temperature light, weak air conditioning."},
+ {n:10,name:"Belt drive and 48 V starter-generator",pic:"belt",at:[226,328],
+  shape:'<rect class="i-pl" x="246" y="323" width="100" height="8" rx="3"/><rect class="i-el" x="338" y="317" width="36" height="20" rx="7"/>',
+  what:"A ribbed belt at the front of the engine drives the air-conditioning compressor and, on the mild hybrid, a 48 V starter-generator. That unit restarts the engine smoothly at traffic lights, charges the batteries when you slow down and adds a small boost when you accelerate.",
+  spot:"Low at the front end of the engine. You may only glimpse the belt and pulleys. The 48 V battery that feeds it is part 13; orange cables mark higher-voltage parts.",
+  you:"Never touch with the engine running or the ignition on. A squealing noise at start-up means the belt needs a look. Leave orange cables alone.",
+  links:"Red battery light, 48 V system or drivetrain messages, start-stop not working."},
+ {n:11,name:"Cabin air filter housing",pic:"cabin",at:[300,76],
+  shape:'<rect class="i-pl" x="200" y="64" width="200" height="24" rx="6"/><path class="i-thin" d="M212 71h176M212 81h176"/>',
+  what:"Air for the cabin is drawn in at the base of the windscreen and passes through a microfilter that catches pollen and dust.",
+  spot:"Under the black plastic trim at the base of the windscreen.",
+  you:"Keep the slots free of leaves. The filter is changed with the service. A musty smell or weak airflow means it is overdue.",
+  links:"Service due: microfilter."},
+ {n:12,name:"Hood struts and latches",pic:"strut",at:[90,196],
+  shape:'<path class="strut" d="M82 96L94 176M518 96L506 176"/><rect class="i-st" x="140" y="386" width="22" height="10" rx="2"/><rect class="i-st" x="438" y="386" width="22" height="10" rx="2"/>',
+  what:"Two gas struts hold the hood open, and two latches at the front corners lock it shut.",
+  spot:"Thin black rods at the sides near the hinges, and metal catches at the front left and right.",
+  you:"If the hood slowly sinks, the struts are worn. After closing, check both sides are flush.",
+  links:"Hood open warning."},
+ {n:13,name:"48 V battery",pic:"batt48",at:[205,112],
+  shape:'<rect class="i-el" x="178" y="98" width="54" height="28" rx="5"/>',
+  what:"A small lithium-ion battery for the mild hybrid system. It stores the energy recovered when you slow down and feeds the starter-generator (part 10).",
+  spot:"A flat box under a plastic cover. Its position differs by build, so the drawing shows only a likely spot. Your owner's manual shows the exact place.",
+  you:"Nothing. It is maintenance-free. Leave the cover on and the cables alone.",
+  links:"48 V system or drivetrain messages, start-stop not working."}
+];
+var seen=store.get("seen",{});var curPart=1;
+function drawBay(){
+  var s='<svg class="bay" viewBox="0 0 600 420" role="img" aria-label="Top view of the engine bay with the parts you can find under the hood">';
+  s+='<path class="body" d="M70 60 Q300 30 530 60 L548 330 Q540 392 470 400 L130 400 Q60 392 52 330 Z"/>';
+  s+='<circle class="tower" cx="104" cy="216" r="20"/><circle class="tower" cx="506" cy="150" r="18"/>';
+  s+='<text x="300" y="52" text-anchor="middle">windscreen</text><text x="300" y="414" text-anchor="middle">front bumper (you stand here)</text>';
+  parts.forEach(function(p){
+    s+='<g class="hot" data-n="'+p.n+'" tabindex="0" role="button" aria-label="'+esc(p.name)+'"><g class="shape">'+p.shape+'</g>'+
+       '<circle class="num" cx="'+p.at[0]+'" cy="'+p.at[1]+'" r="11"/><text class="numt" x="'+p.at[0]+'" y="'+(p.at[1]+5)+'">'+p.n+'</text></g>';
+  });
+  s+='</svg>';
+  $("#bay").innerHTML=s;
+  $("#partlist").innerHTML=parts.map(function(p){return '<button data-n="'+p.n+'"><b>'+p.n+'</b>'+esc(p.name)+'</button>'}).join("");
+  function pick(e){var g=e.target.closest("[data-n]");if(g)showPart(+g.getAttribute("data-n"))}
+  $("#bay").addEventListener("click",pick);$("#partlist").addEventListener("click",pick);
+  $("#bay").addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();pick(e)}});
+}
+function showPart(n){
+  curPart=n;seen[n]=1;store.set("seen",seen);
+  var p=parts[n-1];
+  $("#partDetail").innerHTML='<div class="stack"><h3>'+p.n+'. '+esc(p.name)+'</h3>'+pic(p.pic,p.name)+'<dl class="sheet">'+
+    '<div><dt>What it is</dt><dd>'+p.what+'</dd></div>'+
+    '<div><dt>How to spot it</dt><dd>'+p.spot+'</dd></div>'+
+    '<div><dt>What you do</dt><dd>'+p.you+'</dd></div>'+
+    '<div><dt>Related warnings</dt><dd>'+p.links+' <a href="#warning-lights">See warning lights</a></dd></div></dl>'+
+    '<div class="row"><button class="btn" id="prevP">Previous</button><button class="btn primary" id="nextP">Next part</button></div></div>';
+  $("#prevP").onclick=function(){showPart(n===1?parts.length:n-1)};
+  $("#nextP").onclick=function(){showPart(n===parts.length?1:n+1)};
+  document.querySelectorAll("#bay g.hot,#partlist button").forEach(function(el){
+    var k=+el.getAttribute("data-n");el.classList.toggle("sel",k===n);el.classList.toggle("seen",!!seen[k]);
+  });
+  var c=Object.keys(seen).length;$("#seenCount").textContent="Explored "+c+" of "+parts.length+" parts.";
+}
+
+/* ---------- four-stroke simulation ---------- */
+var strokes=[
+ {t:"1. Intake",d:"The piston moves down. The intake valves open and the cylinder fills with fresh air only. Unlike a petrol engine, no fuel is mixed in yet. The turbocharger pushes this air in under pressure, so more of it fits."},
+ {t:"2. Compression",d:"Both valves close and the piston moves up, squeezing the air to roughly one sixteenth of its volume. Squeezing makes it hot: well above 500 °C. Just before the top, the injector sprays a fine mist of diesel at up to about 2,500 bar."},
+ {t:"3. Power",d:"The diesel ignites by itself in the hot air. The burning gas expands and drives the piston down hard. This is the only stroke that produces power. The connecting rod turns that push into rotation of the crankshaft."},
+ {t:"4. Exhaust",d:"The exhaust valves open and the rising piston pushes the burnt gas out. On its way it spins the turbocharger, then passes through the particulate filter and the AdBlue catalyst."}
+];
+var ang=20,playing=false,raf=0,last=0,curStroke=-1;
+function drawCyl(){
+  var top=70,stroke=110,th=ang*Math.PI/180;
+  var py=top+stroke*(1-Math.cos(th))/2;
+  var st=Math.floor(ang/180)%4;
+  var inOpen=st===0,exOpen=st===3;
+  var inject=(ang>335&&ang<385);
+  var gas=["var(--accent)","var(--amber)","var(--red)","var(--metal)"][st];
+  var op=[.18,.15+.35*((ang-180)/180),.55-.35*((ang-360)/180),.3][st];
+  var cx=150,cy=300,r=34;
+  var kx=cx+r*Math.sin(th),ky=cy-r*Math.cos(th);
+  var s='<svg viewBox="0 0 300 350" role="img" aria-label="Animated cross-section of one cylinder">';
+  s+='<rect x="95" y="'+top+'" width="110" height="'+(py-top)+'" fill="'+gas+'" fill-opacity="'+op.toFixed(2)+'"/>';
+  if(inject) s+='<path d="M150 '+top+' l-28 26 M150 '+top+' l0 32 M150 '+top+' l28 26" stroke="var(--amber)" stroke-width="3" stroke-linecap="round"/>';
+  if(st===2&&ang<470) s+='<circle cx="150" cy="'+(top+ (py-top)/2)+'" r="'+Math.min(40,(py-top)/2)+'" fill="var(--red)" fill-opacity=".45"/>';
+  s+='<path d="M90 '+(top-6)+'V250M210 '+(top-6)+'V250" stroke="var(--metal)" stroke-width="10" fill="none"/>';
+  s+='<path d="M85 '+(top-6)+'h44M171 '+(top-6)+'h44M143 '+(top-6)+'h14" stroke="var(--metal)" stroke-width="10"/>';
+  s+='<rect x="146" y="'+(top-34)+'" width="8" height="30" fill="var(--amber)"/><text x="150" y="'+(top-40)+'" font-size="11" fill="var(--muted)" font-family="sans-serif" text-anchor="middle">injector</text>';
+  var iv=inOpen?10:0,ev=exOpen?10:0;
+  s+='<path d="M136 '+(top-30)+'V'+(top-4+iv)+'M124 '+(top-2+iv)+'h24" stroke="var(--accent)" stroke-width="5" stroke-linecap="round"/>';
+  s+='<path d="M164 '+(top-30)+'V'+(top-4+ev)+'M152 '+(top-2+ev)+'h24" stroke="var(--red)" stroke-width="5" stroke-linecap="round" transform="translate(12 0)"/>';
+  s+='<text x="60" y="'+(top-30)+'" font-size="11" fill="var(--muted)" font-family="sans-serif" text-anchor="middle">air in</text><text x="244" y="'+(top-30)+'" font-size="11" fill="var(--muted)" font-family="sans-serif" text-anchor="middle">exhaust out</text>';
+  if(inOpen) s+='<path d="M60 '+(top-22)+'q30 0 60 22" stroke="var(--accent)" stroke-width="3" fill="none" stroke-dasharray="5 4"/>';
+  if(exOpen) s+='<path d="M192 '+(top)+'q30 -22 52 -22" stroke="var(--red)" stroke-width="3" fill="none" stroke-dasharray="5 4"/>';
+  s+='<rect x="96" y="'+py+'" width="108" height="34" rx="4" fill="var(--metal-2)" stroke="var(--metal)" stroke-width="2"/>';
+  s+='<line x1="150" y1="'+(py+22)+'" x2="'+kx+'" y2="'+ky+'" stroke="var(--metal)" stroke-width="9" stroke-linecap="round"/>';
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r+10)+'" fill="none" stroke="var(--line)" stroke-width="2"/><circle cx="'+cx+'" cy="'+cy+'" r="7" fill="var(--metal)"/><circle cx="'+kx+'" cy="'+ky+'" r="7" fill="var(--ink)"/>';
+  s+='<text x="215" y="'+(py+22)+'" font-size="11" fill="var(--muted)" font-family="sans-serif">piston</text><text x="200" y="320" font-size="11" fill="var(--muted)" font-family="sans-serif">crankshaft</text>';
+  s+='</svg>';
+  $("#cyl").innerHTML=s;
+  if(st!==curStroke){curStroke=st;
+    document.querySelectorAll("#strokebar div").forEach(function(d,i){d.classList.toggle("on",i===st)});
+    $("#strokeText").innerHTML='<h3>'+strokes[st].t+'</h3><p>'+strokes[st].d+'</p><p class="note">Your engine has four of these cylinders firing one after another, so the crankshaft always has one power stroke pushing it.</p>';
+  }
+}
+function tick(t){if(!playing)return;var dt=Math.min(50,t-last);last=t;ang=(ang+dt*0.03*(+$("#speed").value))%720;drawCyl();raf=requestAnimationFrame(tick)}
+function stop(){playing=false;cancelAnimationFrame(raf);var b=$("#play");if(b)b.textContent="Play"}
+function initSim(){
+  drawCyl();
+  $("#play").onclick=function(){if(playing){stop()}else{playing=true;this.textContent="Pause";last=performance.now();raf=requestAnimationFrame(tick)}};
+  $("#step").onclick=function(){stop();ang=((Math.floor(ang/180)+1)%4)*180+90;drawCyl()};
+}
+
+/* ---------- flow drawings ---------- */
+var cyl4=function(xs,y,r){return xs.map(function(x){return '<circle class="i-pl" cx="'+x+'" cy="'+y+'" r="'+r+'"/><circle cx="'+x+'" cy="'+y+'" r="3.5" fill="var(--amber)"/>'}).join("")};
+var air=[
+ {n:"Air filter",pic:"airbox",lx:120,ly:26,shape:'<rect class="i-pl" x="76" y="42" width="88" height="56" rx="8"/><path class="i-thin" d="M88 56h64M88 70h64M88 84h64"/>',
+  d:"Dust is filtered out and a sensor measures the air mass. A clogged filter or dirty sensor means less power and higher consumption."},
+ {n:"Turbo compressor",pic:"turbo",lx:300,ly:26,shape:'<circle class="i-st" cx="300" cy="70" r="34"/>'+swirl(300,70)+'<circle class="i-pl" cx="300" cy="70" r="6"/>',
+  d:"The compressor wheel squeezes the air to roughly two to three times atmospheric pressure. Compressing heats it up. It sits on the same shaft as the turbine at station 5, which is what drives it."},
+ {n:"Charge-air cooler",pic:"radiator",lx:540,ly:26,shape:'<rect class="i-cool" x="494" y="40" width="92" height="60" rx="5"/><path class="i-fin" d="'+fins(502,580,43,97,7)+'"/>',
+  d:"Cools the compressed air again. Cool air is denser, so more oxygen fits into each cylinder. A split hose here causes a hissing noise and sudden power loss."},
+ {n:"Cylinders",pic:"engine",lx:640,ly:252,shape:'<rect class="i-st" x="552" y="150" width="176" height="80" rx="8"/>'+cyl4([580,620,660,700],190,15),
+  d:"Air is compressed, diesel is injected by the common-rail system and burns. Part of the exhaust is fed back in (exhaust gas recirculation, EGR) to lower combustion temperature and nitrogen oxides. EGR valves can clog with soot on short-trip cars."},
+ {n:"Turbo turbine",pic:"turbo",lx:300,ly:252,shape:'<circle class="i-hot" cx="300" cy="190" r="34"/>'+swirl(300,190)+'<circle class="i-pl" cx="300" cy="190" r="6"/>',
+  d:"Hot exhaust spins the turbine that drives the compressor from station 2. Energy that would be wasted is reused."},
+ {n:"Catalyst and particulate filter",pic:"dpf",lx:330,ly:352,shape:'<rect class="i-hot" x="266" y="274" width="128" height="52" rx="24"/><rect class="i-pl" x="300" y="282" width="60" height="36" rx="3"/><path class="i-grid" d="'+fins(308,352,284,316,8)+rows(302,358,291,309,9)+'"/>',
+  d:"The catalyst burns off carbon monoxide and unburnt fuel. The filter traps soot. Every few hundred kilometres the car heats the filter above about 600 °C to burn the soot to ash. This is called regeneration and needs steady driving."},
+ {n:"SCR catalyst with AdBlue",pic:"scr",lx:624,ly:352,shape:'<rect class="i-cool" x="493" y="258" width="14" height="28" rx="3"/><path class="i-spray" d="M500 288l-6 8M500 288v10M500 288l6 8"/><rect class="i-hot" x="560" y="274" width="128" height="52" rx="24"/><path class="i-grid" d="'+fins(588,660,282,318,9)+'"/>',
+  d:"AdBlue is sprayed into the exhaust and turns into ammonia, which converts harmful nitrogen oxides into nitrogen and water. Consumption is small, very roughly a litre per 1,000 km depending on driving."},
+ {n:"Tailpipe",pic:"silencer",lx:896,ly:352,shape:'<rect class="i-st" x="868" y="287" width="62" height="26" rx="13"/><ellipse class="i-pl" cx="924" cy="300" rx="5" ry="9"/>',
+  d:"What leaves is mainly nitrogen, carbon dioxide and water vapour. White steam on a cold morning is normal. Constant blue or black smoke is not."}
+];
+var AIR_BASE='<path class="tube t-cool" d="M24 70H300"/><path class="tube t-warm" d="M300 70H540"/><path class="tube t-cool" d="M540 70H800a60 60 0 0 1 0 120H640"/>'+
+ '<path class="tube t-hot" d="M640 190H160a55 55 0 0 0 0 110H624"/><path class="tube t-clean" d="M624 300H930"/>'+
+ '<path class="dash" d="M24 70H800a60 60 0 0 1 0 120H160a55 55 0 0 0 0 110H930"/>'+
+ '<rect class="i-st" x="293" y="100" width="14" height="60"/>'+tx(314,134,"shared shaft","start")+
+ tx(214,56,"cool air")+tx(420,56,"hot, compressed")+tx(700,56,"cooled again")+tx(450,176,"exhaust")+tx(780,288,"cleaned")+tx(500,250,"AdBlue");
+var pow=[
+ {n:"Engine",pic:"engine",lx:220,ly:104,shape:'<rect class="i-st" x="150" y="112" width="140" height="76" rx="8"/>'+cyl4([176,208,240,272],150,13),
+  d:"Up to about 400 Nm of torque from low revs. That is why a diesel feels strong without revving."},
+ {n:"Torque converter",pic:"gearbox",lx:312,ly:214,shape:'<path class="i-dr" d="M290 108h30l10 10v64l-10 10h-30z"/>',
+  d:"A fluid coupling between engine and gearbox. It lets the car stand still in Drive with the engine running and makes pulling away smooth."},
+ {n:"8-speed automatic",pic:"gearbox",lx:400,ly:112,shape:'<path class="i-dr" d="M330 120l110 14v32l-110 14z"/>',
+  d:"Chooses the gear so the engine stays in its efficient range. BMW calls the oil a lifetime fill; many specialists and the gearbox maker suggest changing it around 80,000 to 120,000 km."},
+ {n:"Propshaft",pic:"propshaft",lx:575,ly:130,shape:'<rect class="i-dr" x="440" y="144" width="266" height="12" rx="4"/><rect class="i-pl" x="560" y="138" width="12" height="24" rx="3"/><rect x="440" y="134" width="266" height="32" fill="transparent"/>',
+  d:"A long shaft under the centre tunnel that carries rotation to the back of the car."},
+ {n:"Rear differential",pic:"diff",lx:838,ly:154,shape:'<rect class="i-st" x="734" y="70" width="12" height="52" rx="4"/><rect class="i-st" x="734" y="178" width="12" height="52" rx="4"/><ellipse class="i-dr" cx="740" cy="150" rx="36" ry="30"/>',
+  d:"Turns the drive through 90 degrees and lets the two rear wheels rotate at different speeds in a corner."},
+ {n:"Rear wheels",pic:"brake",lx:836,ly:90,shape:'<rect class="i-rub" x="698" y="38" width="84" height="32" rx="10"/><rect class="i-rub" x="698" y="230" width="84" height="32" rx="10"/>',
+  d:"Your car is rear-wheel drive: the back wheels push, the front wheels only steer. On snow and wet leaves that means gentle throttle and good winter tyres matter."}
+];
+var POW_BASE='<path class="cb" d="M70 62Q46 150 70 238Q240 268 480 266Q760 268 892 236Q914 150 892 64Q760 32 480 34Q240 32 70 62Z"/>'+
+ '<path class="ghost" d="M192 70V112M192 188V230"/>'+
+ '<rect class="i-rub" x="150" y="38" width="84" height="32" rx="10" transform="rotate(-8 192 54)"/><rect class="i-rub" x="150" y="230" width="84" height="32" rx="10" transform="rotate(-8 192 246)"/>'+
+ tx(192,26,"front wheels only steer");
+var POW_TOP='<path class="t-drive dash" style="stroke:var(--surface)" d="M220 150H740M740 150V72M740 150V228"/>';
+function buildFlow(id,det,data,vb,base,top,label){
+  var el=$(id);
+  var s='<svg class="flowsvg" viewBox="'+vb+'" role="img" aria-label="'+label+'">'+base;
+  data.forEach(function(d,i){s+='<g class="st" data-i="'+i+'" tabindex="0" role="button" aria-label="'+esc(d.n)+'"><g class="shape">'+d.shape+'</g><text x="'+d.lx+'" y="'+d.ly+'">'+(i+1)+' '+esc(d.n)+'</text></g>'});
+  el.innerHTML=s+(top||"")+'</svg>';
+  function show(i){el.querySelectorAll("g.st").forEach(function(b){b.classList.toggle("sel",+b.getAttribute("data-i")===i)});
+    var d=data[i];centre(el,d.lx);
+    $(det).innerHTML='<div class="flowdetail">'+pic(d.pic,d.n)+'<div class="stack"><h3>'+(i+1)+'. '+esc(d.n)+'</h3><p style="max-width:65ch">'+d.d+'</p>'+
+      '<div class="row"><button class="btn" data-go="'+((i+data.length-1)%data.length)+'">Previous</button><button class="btn primary" data-go="'+((i+1)%data.length)+'">Next station</button></div></div></div>'}
+  function pick(e){var b=e.target.closest("g.st");if(b)show(+b.getAttribute("data-i"))}
+  el.addEventListener("click",pick);
+  el.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();pick(e)}});
+  $(det).addEventListener("click",function(e){var b=e.target.closest("[data-go]");if(b)show(+b.getAttribute("data-go"))});
+  show(0);
+}
+
+/* ---------- warning lights ---------- */
+var lights=[
+ {c:"red",i:"oil",n:"Engine oil pressure",part:"Oil pump, oil level (engine bay part 2)",mean:"Oil is not reaching the engine at enough pressure. Metal parts can destroy each other within seconds to minutes.",act:"Stop as soon as it is safe and switch the engine off. Do not restart. Call BMW roadside assistance or your breakdown service.",drive:"No"},
+ {c:"red",i:"temp",n:"Engine overheating",part:"Cooling system: coolant tank (part 3), radiator and fan (part 9), water pump",mean:"Coolant is too hot. The engine can warp or seize.",act:"Stop safely, switch off, let it cool for at least 30 minutes. Do not open the coolant cap while hot. If the level is low once cold, top up and drive to a workshop; if unsure, get towed.",drive:"No"},
+ {c:"red",i:"batt",n:"Battery not charging",part:"Starter-generator and belt (part 10), 12 V battery in the boot",mean:"The battery is no longer being charged. The car runs on stored energy only and will eventually stop.",act:"Switch off heavy consumers such as seat heating and rear demister. Drive directly to a workshop or a safe place. Do not switch the engine off until you are there: it may not restart.",drive:"Short distance only"},
+ {c:"red",i:"brake",n:"Brake system",part:"Brake fluid reservoir (part 5), brake hydraulics",mean:"Brake fluid is low or there is a fault in the brake system. If it lights together with a soft or long pedal, braking power is reduced.",act:"First check that the parking brake is released. If it stays on, stop carefully and call for assistance. Do not just top up: a falling level means worn pads or a leak.",drive:"No"},
+ {c:"red",i:"park",n:"Parking brake applied",part:"Electric parking brake at the rear wheels",mean:"The parking brake is on. Normal when parked.",act:"Release it with the P switch while pressing the brake pedal. If the symbol turns yellow, the parking brake has a fault: have it checked.",drive:"Yes, once released"},
+ {c:"red",i:"airbag",n:"Airbag and restraint system",part:"Airbags, belt tensioners, crash sensors",mean:"A fault in the system. Airbags may not fire in a crash.",act:"The car drives normally, but book a workshop visit soon. Make sure all belts are fastened.",drive:"Yes, get it checked"},
+ {c:"red",i:"belt",n:"Seat belt reminder",part:"Belt buckle sensors",mean:"Someone is not buckled up, or a heavy bag sits on a seat.",act:"Fasten the belt. Move heavy items off the passenger seat.",drive:"After fastening"},
+ {c:"red",i:"steer",n:"Steering fault (red)",part:"Electric power steering",mean:"Power steering has failed. The wheel becomes very heavy. In yellow, assistance is reduced.",act:"Red: stop safely and call assistance. Yellow: drive carefully to a workshop.",drive:"Red: no"},
+ {c:"amber",i:"engine",n:"Engine warning (emissions)",part:"Engine management: sensors, injection, EGR, DPF, AdBlue system",mean:"The engine computer has stored a fault that affects emissions. Steady light: not an emergency. Flashing: misfire that can damage the exhaust cleaning.",act:"Steady: drive moderately and have the fault memory read within days. Flashing: reduce load at once and go straight to a workshop. Check the fuel cap clicked shut after refuelling.",drive:"Carefully"},
+ {c:"amber",i:"gear",n:"Drivetrain malfunction",part:"Engine, turbo (part 8), gearbox, 48 V system",mean:"BMW's general message for a powertrain fault. The car often limits power to protect itself (limp mode).",act:"Avoid hard acceleration. Stop, switch off, wait a minute and restart: if it clears and returns later, still have it read out. If power stays low, go to a workshop.",drive:"Carefully"},
+ {c:"amber",i:"oil",n:"Engine oil level low",part:"Oil filler (part 2), oil level sensor",mean:"The oil level is at minimum. This is the yellow version of the oil can: a top-up request, not a pressure emergency.",act:"Add 1 litre of approved oil at the next fuel stop, engine off. Measure again on the screen after a short drive. Keep a 1 litre bottle in the boot.",drive:"Yes, top up soon"},
+ {c:"amber",i:"coolant",n:"Coolant level low",part:"Coolant expansion tank (part 3)",mean:"The coolant level has dropped to minimum.",act:"Let the engine cool completely, then check the tank and top up to MAX with approved coolant. If it happens again, there is a leak.",drive:"Short distance, watch temperature"},
+ {c:"amber",i:"tyre",n:"Tyre pressure (TPM)",part:"Pressure sensors inside each wheel",mean:"At least one tyre has lost pressure, or pressures were not reset after a tyre change.",act:"Slow down, avoid hard steering, and check all four at a fuel station. Pressures are on the sticker in the driver's door pillar. After correcting, run the reset under CAR &gt; Vehicle status &gt; Tyre Pressure Monitor. A fast loss means a puncture: your car likely has no spare, so use the mobility kit or call assistance.",drive:"Slowly to the next air pump"},
+ {c:"amber",i:"abs",n:"ABS fault",part:"Wheel speed sensors, ABS control unit",mean:"Anti-lock braking is off. Normal braking still works, but wheels can lock in an emergency stop.",act:"Drive with more distance, brake gently, visit a workshop. Often a dirty or failed wheel speed sensor.",drive:"Yes, carefully"},
+ {c:"amber",i:"dsc",n:"DSC stability control",part:"DSC control unit, wheel speed and steering sensors",mean:"Flashing: DSC is actively working because the road is slippery. That is normal. Steady: DSC is switched off or faulty.",act:"Flashing: ease off the throttle. Steady: check you did not press the DSC OFF button; otherwise drive carefully and have it checked.",drive:"Yes, carefully"},
+ {c:"amber",i:"pads",n:"Brake pad wear",part:"Wear sensors in the front and rear pads",mean:"The pads have reached their wear limit.",act:"Book new pads within the next few hundred kilometres. Waiting damages the discs and costs far more.",drive:"Yes, book service"},
+ {c:"amber",i:"adblue",n:"AdBlue range",part:"AdBlue tank, filler next to the diesel filler",mean:"The AdBlue is running low. The display counts down the remaining kilometres.",act:"Refill at least 5 litres, ideally fill up. Available at fuel stations and DIY stores. Use a canister with a spout and wipe spills: it crystallises white. At zero range the engine will not restart.",drive:"Yes, refill in time"},
+ {c:"amber",i:"glow",n:"Preheating (glow plugs)",part:"Glow plugs in each cylinder",mean:"On a very cold start the engine preheats briefly. If the symbol or a preheating message stays on while driving, a glow plug or its control unit is faulty.",act:"Wait for it to go out before starting in deep cold. If it stays, cold starts get rough: have it checked.",drive:"Yes"},
+ {c:"amber",i:"fuel",n:"Fuel reserve",part:"Fuel tank",mean:"Roughly 50 to 80 km of range left.",act:"Refuel with diesel. Do not run a diesel dry: the injection system can draw air and may need bleeding.",drive:"Yes, refuel"},
+ {c:"amber",i:"service",n:"Service due",part:"Condition Based Service",mean:"A service item has reached its date or distance.",act:"Open CAR &gt; Vehicle status &gt; Service requirements to see which item, then book it.",drive:"Yes"},
+ {c:"amber",i:"washer",n:"Washer fluid low",part:"Washer fluid filler (part 4)",mean:"About a litre left.",act:"Refill with ready-mixed washer fluid.",drive:"Yes"},
+ {c:"green",i:"frost",n:"Outside temperature warning",part:"Outside temperature sensor",mean:"A chime and snowflake at about +3 °C and below: black ice is possible, especially on bridges.",act:"Drive smoothly and leave more distance.",drive:"Yes"}
+];
+var lf="all",curLight=0;
+function drawLights(){
+  $("#lights").innerHTML=lights.map(function(l,i){return (lf==="all"||lf===l.c)?'<button class="light '+l.c+(i===curLight?' sel':'')+'" data-i="'+i+'">'+icon(l.i)+'<span>'+esc(l.n)+'</span></button>':''}).join("");
+}
+function showLight(i){curLight=i;var l=lights[i];var lab={red:"Red: stop",amber:"Yellow: act soon",green:"Information"}[l.c];
+  $("#lightDetail").innerHTML='<div class="stack"><div class="row"><div class="bigicon '+l.c+'">'+icon(l.i)+'</div><div class="stack" style="gap:4px"><h3>'+esc(l.n)+'</h3><span><span class="pill '+l.c+'">'+lab+'</span></span></div></div><dl class="sheet">'+
+  '<div><dt>What it means</dt><dd>'+l.mean+'</dd></div><div><dt>Connected equipment</dt><dd>'+l.part+'</dd></div><div><dt>What to do</dt><dd>'+l.act+'</dd></div><div><dt>Keep driving?</dt><dd><b>'+l.drive+'</b></dd></div></dl></div>';
+  drawLights();
+}
+function initLights(){
+  $("#lights").addEventListener("click",function(e){var b=e.target.closest("button");if(b)showLight(+b.getAttribute("data-i"))});
+  $("#lightFilter").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;lf=b.getAttribute("data-f");
+    document.querySelectorAll("#lightFilter button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});drawLights()});
+  showLight(0);
+}
+
+/* ---------- maintenance ---------- */
+var due5=[
+ ["Brake fluid change","Due every 2 years. If it was done at year 3, it is due again now."],
+ ["Engine oil and filter","At the latest every 2 years or about 30,000 km, whichever the car reports first. With many short trips, yearly is kinder to the engine."],
+ ["Main inspection (HU/AU, TÜV)","In Germany a new car is first tested after 3 years, then every 2 years: 2024, then 2026. Check the round sticker on the rear number plate."],
+ ["Cabin microfilter and engine air filter","Usually replaced with the oil service or every second one."],
+ ["Diesel fuel filter","The car flags it through the service menu, typically every second or third oil service."],
+ ["12 V battery health","Batteries usually last 5 to 8 years. Ask for a battery test at the next service. A new one must be registered to the car by the workshop."],
+ ["Tyre age and tread","Read the four-digit DOT code on the sidewall (week and year). Have tyres older than about 6 years inspected. Legal minimum tread is 1.6 mm; 3 mm for summer and 4 mm for winter tyres is the sensible limit."],
+ ["Wiper blades","Replace about once a year or when they smear."]
+];
+var svc=[
+ ["Engine oil and filter","Car decides; max. 2 years / ~30,000 km","Workshop","Old oil loses its ability to protect the turbo and timing chain."],
+ ["Brake fluid","Every 2 years","Workshop","Absorbs moisture, which lowers its boiling point and corrodes parts."],
+ ["Front and rear brake pads","By wear sensor; remaining km shown","Workshop","Discs are usually replaced with every second set of pads."],
+ ["Vehicle check","With every second oil service","Workshop","General inspection of suspension, lights, leaks, belts, underbody."],
+ ["Cabin microfilter","About every 2 years","Workshop or DIY","Clean cabin air and a demister that works."],
+ ["Engine air filter","About every 60,000 km","Workshop","Protects the turbo and engine from dust."],
+ ["Diesel fuel filter","About every 60,000 km","Workshop","Protects the high-pressure pump and injectors from water and dirt."],
+ ["AdBlue","When range is shown; refill any time","You","Required for the exhaust cleaning. Engine will not restart when empty."],
+ ["Coolant","Check monthly; no fixed change interval","You check","A falling level is always a sign of a leak."],
+ ["Automatic gearbox oil","Not in BMW's plan; often advised at 80,000 to 120,000 km","Specialist","Optional, discussed with your workshop."],
+ ["Air conditioning service","Every 2 to 3 years, optional","Workshop","Refrigerant slowly escapes; cooling gets weaker."],
+ ["Timing chain","No interval","Listen","A metallic rattle for a few seconds at cold start should be checked."],
+ ["Tyres: pressure","Monthly and before long trips","You","Values on the driver's door pillar sticker. Check cold."],
+ ["Winter tyres (Germany)","In wintry conditions; rule of thumb October to Easter","Tyre shop","Required by law on snow, slush and ice. Must carry the Alpine mountain-snowflake symbol."]
+];
+var monthly=[
+ ["Oil level on the screen","CAR > Vehicle status > Engine oil level. Engine warm, car level."],
+ ["Service requirements on the screen","CAR > Vehicle status > Service requirements. Note anything turning yellow."],
+ ["AdBlue range","Shown in the same vehicle status area."],
+ ["Tyre pressures and a look at the tread","Check for nails, cuts and uneven wear."],
+ ["Coolant level, engine cold","Between MIN and MAX."],
+ ["Washer fluid","Top up through the blue cap."],
+ ["All lights working","Walk around once with lights and hazards on."],
+ ["Ground under the parked car","Clear water under the front in summer is A/C condensation and normal. Oily or coloured drops are not."]
+];
+function chkList(id,key,data){
+  var st=store.get(key,{});
+  $(id).innerHTML=data.map(function(d,i){return '<label class="chk" for="'+key+i+'"><input type="checkbox" id="'+key+i+'" data-i="'+i+'"'+(st[i]?' checked':'')+'><span><b>'+esc(d[0])+'</b><small>'+esc(d[1])+'</small></span></label>'}).join("");
+  $(id).onchange=function(e){var i=e.target.getAttribute("data-i");if(i==null)return;st[i]=e.target.checked?1:0;store.set(key,st)};
+}
+function initMaint(){
+  chkList("#due5","due5",due5);chkList("#monthly","monthly",monthly);
+  $("#resetMonthly").onclick=function(){store.set("monthly",{});chkList("#monthly","monthly",monthly)};
+  $("#svcTable").innerHTML='<tr><th>Item</th><th>Typical timing</th><th>Who</th><th>Why it matters</th></tr>'+svc.map(function(r){return '<tr><td><b>'+esc(r[0])+'</b></td><td>'+esc(r[1])+'</td><td class="num">'+esc(r[2])+'</td><td>'+esc(r[3])+'</td></tr>'}).join("");
+}
+
+/* ---------- quiz ---------- */
+var quiz=[
+ {q:"On the motorway a red oil can lights up with a chime.",o:["Drive to the next service area and check there","Stop as soon as it is safe, switch off, call assistance","Top up oil at the next fuel stop"],a:1,e:"Red oil can means no oil pressure. Every further second risks the engine. The yellow oil can is the harmless top-up request."},
+ {q:"A yellow oil message asks you to add 1 litre of engine oil.",o:["Call a tow truck","Add 1 litre of approved oil soon, engine off, then re-measure on the screen","Ignore it until the next service"],a:1,e:"Yellow is a level warning. Top up through the filler cap on the engine. Your car has no dipstick, so check on the screen."},
+ {q:"You only drive 5 km to work and back. One evening the fan roars after you park and it smells hot.",o:["The engine is overheating","The particulate filter was regenerating","The turbo is broken"],a:1,e:"Short trips interrupt the filter's cleaning cycle. Plan a 20 to 30 minute steady drive regularly so it can finish."},
+ {q:"The display says AdBlue range 1,000 km.",o:["Refill AdBlue soon through the blue filler behind the fuel flap","Pour AdBlue into the diesel tank","Nothing, it refills itself"],a:0,e:"AdBlue has its own tank and filler. At zero range the engine will not restart. AdBlue in the diesel tank is an expensive mistake."},
+ {q:"The car will not start; the battery seems flat. Where do you connect jump leads?",o:["Directly to the battery in the boot","To the plus terminal and earth point under the hood","To the cigarette lighter socket"],a:1,e:"BMW provides jump-start points in the engine bay. Positive under the red flap, negative on the marked body earth point."},
+ {q:"The coolant warning appears. You stop and the engine is hot. What now?",o:["Open the coolant cap right away to look","Wait until the engine is cold before opening anything","Pour cold water over the engine"],a:1,e:"A hot cooling system is under pressure. Opening the cap can spray scalding coolant. Wait at least 30 minutes."},
+ {q:"The yellow tyre pressure light comes on in town.",o:["Keep going, it is only a sensor","Slow down, check all four pressures at the next air pump, then reset the monitor","Brake hard to test the tyres"],a:1,e:"Find the right values on the door pillar sticker. If one tyre keeps losing air, it has a puncture."},
+ {q:"The yellow DSC symbol flashes while you accelerate on a wet roundabout.",o:["The system has a fault","The system is working: the rear wheels were slipping","The brakes are overheating"],a:1,e:"Flashing means DSC is intervening. On a rear-wheel-drive car that happens quickly in the wet. Ease off the throttle."},
+ {q:"A steady yellow engine symbol appears; the car drives normally.",o:["Stop immediately and get towed","Drive moderately and have the fault memory read within a few days","Disconnect the battery to clear it"],a:1,e:"Steady yellow is an emissions-related fault, often a sensor. A flashing engine light is the urgent one."},
+ {q:"The service menu shows brake fluid due.",o:["Top it up yourself with any fluid","Book a brake fluid change at a workshop","It can wait until the pads are worn"],a:1,e:"The fluid is replaced completely, every two years, because it absorbs moisture. This is a workshop job."}
+];
+var qi=0,score=0,answered=false;
+function drawQuiz(){
+  var best=store.get("best",0);
+  if(qi>=quiz.length){
+    if(score>best){best=score;store.set("best",best)}
+    $("#quizBox").innerHTML='<h3>'+score+' of '+quiz.length+' correct</h3><p>'+(score>=8?"You can read your car's signals. Repeat in a few weeks to keep it fresh.":"Go through the warning lights section again and retry.")+'</p><p class="small">Best so far: '+best+' of '+quiz.length+'</p><div class="row"><button class="btn primary" id="again">Start again</button><a class="btn" href="#warning-lights" style="text-decoration:none;color:inherit">Review warning lights</a></div>';
+    $("#again").onclick=function(){qi=0;score=0;drawQuiz()};return;
+  }
+  var q=quiz[qi];answered=false;
+  $("#quizBox").innerHTML='<div class="progress"><i style="width:'+(qi/quiz.length*100)+'%"></i></div><p class="small">Situation '+(qi+1)+' of '+quiz.length+(best?' · best '+best+'/'+quiz.length:'')+'</p><h3>'+esc(q.q)+'</h3><div class="opts">'+q.o.map(function(o,i){return '<button data-i="'+i+'">'+esc(o)+'</button>'}).join("")+'</div><div id="qfb"></div>';
+  $("#quizBox .opts").onclick=function(e){var b=e.target.closest("button");if(!b||answered)return;answered=true;var i=+b.getAttribute("data-i");
+    if(i===q.a)score++;
+    document.querySelectorAll("#quizBox .opts button").forEach(function(x,k){x.disabled=true;if(k===q.a)x.classList.add("right");else if(k===i)x.classList.add("wrong")});
+    $("#qfb").innerHTML='<div class="stack"><p class="note">'+(i===q.a?"<b>Correct.</b> ":"<b>Not quite.</b> ")+esc(q.e)+'</p><div class="row"><button class="btn primary" id="nq">'+(qi===quiz.length-1?"See result":"Next situation")+'</button></div></div>';
+    $("#nq").onclick=function(){qi++;drawQuiz()};$("#nq").focus();
+  };
+}
+
+drawCar();drawBay();showPart(1);initSim();
+buildFlow("#flow","#flowDetail",air,"0 0 960 368",AIR_BASE,"","The path of the air from the air filter through the turbo, cooler and cylinders, then as exhaust through the turbine, filter and catalyst to the tailpipe");
+buildFlow("#power","#powerDetail",pow,"0 0 960 300",POW_BASE,POW_TOP,"Top view of the car showing power going from the engine through the gearbox and propshaft to the rear wheels");
+initLights();initMaint();drawQuiz();route();
+})();
+</script>
